@@ -1,6 +1,8 @@
 package com.saimega.vinayakacablenetwork
 
 import android.content.Intent
+import android.content.ClipData
+import android.net.Uri
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -39,18 +41,28 @@ import java.io.IOException
 
 class ReceiptActivity : BaseActivity() {
 
+    private lateinit var tvReceiptBusinessName: TextView
+    private lateinit var tvReceiptBusinessContact: TextView
     private lateinit var tvReceiptName: TextView
     private lateinit var tvReceiptSeries: TextView
+    private lateinit var tvReceiptNumber: TextView
     private lateinit var tvReceiptDate: TextView
+    private lateinit var tvReceiptBillLabel: TextView
     private lateinit var tvReceiptBaseAmount: TextView
+    private lateinit var tvReceiptPreviousOutstanding: TextView
     private lateinit var tvReceiptExtraCharges: TextView
+    private lateinit var tvReceiptAlreadyPaid: TextView
+    private lateinit var tvReceiptTotalPayable: TextView
     private lateinit var tvReceiptAmount: TextView
+    private lateinit var tvReceiptBalance: TextView
+    private lateinit var tvReceiptCollector: TextView
     private lateinit var tvReceiptMode: TextView
     private lateinit var btnPrint: MaterialButton
     private lateinit var btnShare: MaterialButton
     private lateinit var btnBluetoothPrint: MaterialButton
 
     private val db = FirebaseFirestore.getInstance()
+    private var businessSettings = BusinessSettings()
     private var customerId: String = ""
     private var latestPayment: PaymentModel? = null
 
@@ -73,12 +85,21 @@ class ReceiptActivity : BaseActivity() {
     }
 
     private fun bindViews() {
+        tvReceiptBusinessName = findViewById(R.id.tvReceiptHeader)
+        tvReceiptBusinessContact = findViewById(R.id.tvReceiptBusinessContact)
         tvReceiptName         = findViewById(R.id.tvReceiptName)
         tvReceiptSeries       = findViewById(R.id.tvReceiptSeries)
+        tvReceiptNumber       = findViewById(R.id.tvReceiptNumber)
         tvReceiptDate         = findViewById(R.id.tvReceiptDate)
+        tvReceiptBillLabel    = findViewById(R.id.tvReceiptBillLabel)
         tvReceiptBaseAmount   = findViewById(R.id.tvReceiptBaseAmount)
+        tvReceiptPreviousOutstanding = findViewById(R.id.tvReceiptPreviousOutstanding)
         tvReceiptExtraCharges = findViewById(R.id.tvReceiptExtraCharges)
+        tvReceiptAlreadyPaid  = findViewById(R.id.tvReceiptAlreadyPaid)
+        tvReceiptTotalPayable = findViewById(R.id.tvReceiptTotalPayable)
         tvReceiptAmount       = findViewById(R.id.tvReceiptAmount)
+        tvReceiptBalance      = findViewById(R.id.tvReceiptBalance)
+        tvReceiptCollector    = findViewById(R.id.tvReceiptCollector)
         tvReceiptMode         = findViewById(R.id.tvReceiptMode)
         btnPrint              = findViewById(R.id.btnPrint)
         btnShare              = findViewById(R.id.btnShare)
@@ -95,6 +116,8 @@ class ReceiptActivity : BaseActivity() {
 
         lifecycleScope.launch {
             try {
+                businessSettings = runCatching { BusinessSettingsRepository().load() }
+                    .getOrDefault(BusinessSettings())
                 val doc = withContext(Dispatchers.IO) {
                     if (!paymentId.isNullOrEmpty()) {
                         val d = db.collection("payments").document(paymentId).get().await()
@@ -123,13 +146,24 @@ class ReceiptActivity : BaseActivity() {
                     paymentId     = doc.id,
                     customerId    = doc.getString("customerId") ?: customerId,
                     name          = doc.getString("name") ?: customerId,
+                    teluguName    = doc.getString("teluguName") ?: "",
+                    phone          = doc.getString("phone") ?: "",
+                    vcNumber       = doc.getString("vcNumber") ?: "",
+                    packageName    = doc.getString("packageName") ?: "",
                     baseAmount    = (doc.get("baseAmount") as? Number)?.toDouble() ?: 0.0,
+                    billAmount    = (doc.get("billAmount") as? Number)?.toDouble() ?: 0.0,
+                    previousOutstanding = (doc.get("previousOutstanding") as? Number)?.toDouble() ?: 0.0,
+                    alreadyPaid = (doc.get("alreadyPaid") as? Number)?.toDouble() ?: 0.0,
                     extraCharges  = (doc.get("extraCharges") as? Number)?.toDouble() ?: 0.0,
                     total         = (doc.get("total") as? Number)?.toDouble() ?: 0.0,
                     paid          = (doc.get("paid") as? Number)?.toDouble() ?: 0.0,
                     remaining     = (doc.get("remaining") as? Number)?.toDouble() ?: 0.0,
                     paymentMode   = doc.getString("paymentMode") ?: "Cash",
                     paymentNumber = doc.getString("paymentNumber") ?: "",
+                    remarks       = doc.getString("remarks") ?: "",
+                    smsRequested  = doc.getBoolean("smsRequested") ?: false,
+                    receiptNumber = doc.getString("receiptNumber") ?: "",
+                    collectorUsername = doc.getString("collectorUsername") ?: "",
                     date          = doc.getString("date") ?: "N/A",
                     timestamp     = (doc.get("timestamp") as? Number)?.toLong() ?: 0L
                 )
@@ -160,12 +194,23 @@ class ReceiptActivity : BaseActivity() {
 
     private fun populateUI() {
         val p = latestPayment ?: return
-        tvReceiptName.text         = p.name
+        tvReceiptBusinessName.text = businessSettings.name
+        tvReceiptBusinessContact.text = listOf(businessSettings.phone, businessSettings.address)
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+        tvReceiptName.text         = p.displayName(LocaleHelper.getLanguage(this))
         tvReceiptSeries.text       = customerId
+        tvReceiptNumber.text       = p.receiptNumber.ifBlank { getString(R.string.dash) }
         tvReceiptDate.text         = p.date
-        tvReceiptBaseAmount.text   = "₹ ${formatAmount(p.baseAmount)}"
+        tvReceiptBillLabel.text = getString(R.string.monthly_bill_label)
+        tvReceiptBaseAmount.text   = "₹ ${formatAmount(if (p.billAmount > 0.0) p.billAmount else p.baseAmount)}"
+        tvReceiptPreviousOutstanding.text = "₹ ${formatAmount(p.previousOutstanding)}"
         tvReceiptExtraCharges.text = getString(R.string.rupee_value, formatAmount(p.extraCharges))
+        tvReceiptAlreadyPaid.text = "₹ ${formatAmount(p.alreadyPaid)}"
+        tvReceiptTotalPayable.text = "₹ ${formatAmount(p.total)}"
         tvReceiptAmount.text       = "₹ ${formatAmount(p.paid)}"
+        tvReceiptBalance.text      = "₹ ${formatAmount(p.remaining.coerceAtLeast(0.0))}"
+        tvReceiptCollector.text    = p.collectorUsername.ifBlank { getString(R.string.dash) }
         tvReceiptMode.text         = buildModeText(p.paymentMode, p.paymentNumber)
 
         btnPrint.isEnabled = true
@@ -278,11 +323,21 @@ class ReceiptActivity : BaseActivity() {
                 customerName = p.name,
                 customerId = customerId,
                 date = p.date,
-                baseAmount = p.baseAmount,
+                baseAmount = if (p.billAmount > 0.0) p.billAmount else p.baseAmount,
                 extraCharges = p.extraCharges,
                 totalPaid = p.paid,
                 paymentMode = p.paymentMode,
-                paymentNumber = p.paymentNumber
+                paymentNumber = p.paymentNumber,
+                receiptNumber = p.receiptNumber,
+                remainingAmount = p.remaining.coerceAtLeast(0.0),
+                collectorUsername = p.collectorUsername,
+                previousOutstanding = p.previousOutstanding,
+                alreadyPaid = p.alreadyPaid,
+                totalPayable = p.total,
+                businessName = businessSettings.name,
+                businessPhone = businessSettings.phone,
+                businessAddress = businessSettings.address,
+                receiptFooter = businessSettings.receiptFooter
             )
             if (success) {
                 Toast.makeText(this@ReceiptActivity, "Printed successfully via Bluetooth", Toast.LENGTH_SHORT).show()
@@ -304,6 +359,7 @@ class ReceiptActivity : BaseActivity() {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/pdf"
                 putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newUri(contentResolver, pdfFile.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(Intent.createChooser(shareIntent, "Share Bill via..."))
@@ -334,26 +390,45 @@ class ReceiptActivity : BaseActivity() {
     }
 
     private fun shareToWhatsApp() {
-        val pdfFile = generateReceiptPdf() ?: run {
-            Toast.makeText(this, getString(R.string.could_not_generate_pdf), Toast.LENGTH_SHORT).show()
-            return
-        }
-
+        val payment = latestPayment ?: return
         try {
-            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", pdfFile)
-
-            val whatsappIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                setPackage("com.whatsapp")
+            val phoneDigits = payment.phone.filter(Char::isDigit)
+            val whatsappPhone = when {
+                phoneDigits.length == 10 -> "91$phoneDigits"
+                phoneDigits.startsWith("0") -> phoneDigits.drop(1)
+                else -> phoneDigits
             }
-
-            if (whatsappIntent.resolveActivity(packageManager) != null) {
+            val bill = if (payment.billAmount > 0.0) payment.billAmount else payment.baseAmount
+            val message = getString(
+                R.string.whatsapp_receipt_message,
+                businessSettings.name,
+                businessSettings.phone,
+                businessSettings.address,
+                payment.receiptNumber.ifBlank { payment.paymentId },
+                payment.displayName(LocaleHelper.getLanguage(this)),
+                customerId,
+                payment.date,
+                formatAmount(bill),
+                formatAmount(payment.previousOutstanding),
+                formatAmount(payment.extraCharges),
+                formatAmount(payment.alreadyPaid),
+                formatAmount(payment.total),
+                formatAmount(payment.paid),
+                formatAmount(payment.remaining.coerceAtLeast(0.0)),
+                buildModeText(payment.paymentMode, payment.paymentNumber),
+                payment.collectorUsername,
+                businessSettings.receiptFooter
+            )
+            val whatsappUri = Uri.parse("https://wa.me/$whatsappPhone?text=${Uri.encode(message)}")
+            val whatsappIntent = Intent(Intent.ACTION_VIEW, whatsappUri).setPackage("com.whatsapp")
+            if (whatsappPhone.isNotBlank() && whatsappIntent.resolveActivity(packageManager) != null) {
                 startActivity(whatsappIntent)
             } else {
-                Toast.makeText(this, "WhatsApp not installed — showing share options instead", Toast.LENGTH_SHORT).show()
-                shareReceipt()
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, message)
+                }
+                startActivity(Intent.createChooser(shareIntent, getString(R.string.view_share_receipt)))
             }
         } catch (e: Exception) {
             Log.e("ReceiptActivity", "WhatsApp share error: ${e.message}", e)
@@ -377,7 +452,7 @@ class ReceiptActivity : BaseActivity() {
         paint.textAlign = Paint.Align.CENTER
         paint.textSize  = 20f
         paint.typeface  = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText(getString(R.string.business_name_caps), width / 2, 65f, paint)
+        canvas.drawText(businessSettings.name, width / 2, 65f, paint)
 
         paint.textSize = 13f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
@@ -412,11 +487,15 @@ class ReceiptActivity : BaseActivity() {
             y += rowGap
         }
 
-        drawRow(getString(R.string.customer_name_label),  p.name)
+        drawRow(getString(R.string.customer_name_label),  p.displayName(LocaleHelper.getLanguage(this)))
         drawRow(getString(R.string.series_number_label),  customerId)
+        drawRow(getString(R.string.receipt_number_label), p.receiptNumber.ifBlank { getString(R.string.dash) })
         drawRow(getString(R.string.date_label),            p.date)
-        drawRow(getString(R.string.base_amount_label),    "₹ ${formatAmount(p.baseAmount)}")
+        drawRow(getString(R.string.monthly_bill_label), "₹ ${formatAmount(if (p.billAmount > 0.0) p.billAmount else p.baseAmount)}")
+        drawRow(getString(R.string.previous_outstanding_label), "₹ ${formatAmount(p.previousOutstanding)}")
         drawRow(getString(R.string.extra_charges_label),  "₹ ${formatAmount(p.extraCharges)}")
+        drawRow(getString(R.string.already_paid_label), "₹ ${formatAmount(p.alreadyPaid)}")
+        drawRow(getString(R.string.total_payable_label), "₹ ${formatAmount(p.total)}")
         drawRow(
             getString(R.string.total_paid),
             "₹ ${formatAmount(p.paid)}",
@@ -424,6 +503,8 @@ class ReceiptActivity : BaseActivity() {
             valueSize  = 18f
         )
         drawRow(getString(R.string.payment_mode_label), buildModeText(p.paymentMode, p.paymentNumber))
+        drawRow(getString(R.string.collector_label), p.collectorUsername.ifBlank { getString(R.string.dash) })
+        if (p.remarks.isNotBlank()) drawRow(getString(R.string.payment_remarks), p.remarks)
 
         // Footer
         y += 20f
@@ -431,7 +512,7 @@ class ReceiptActivity : BaseActivity() {
         paint.typeface  = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
         paint.color     = Color.parseColor("#558B2F")
         paint.textSize  = 12f
-        canvas.drawText(getString(R.string.thank_you_payment), width / 2, y, paint)
+        canvas.drawText(businessSettings.receiptFooter, width / 2, y, paint)
     }
 
     private fun buildModeText(mode: String, number: String): String =

@@ -9,7 +9,7 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="@color/cm_sidebar"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -17,8 +17,10 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:title="Today's Collection"
+            app:titleTextColor="@color/cm_on_gradient"
             app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
-            app:navigationIcon="?attr/homeAsUpIndicator" />
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:navigationIconTint="@color/cm_on_gradient" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -38,9 +40,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="#4F46E5">
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/cm_sidebar">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -53,7 +55,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/total_collected_today"
-                        android:textColor="#C7D2FE"
+                        android:textColor="@color/cm_nav_secondary"
                         android:textSize="12sp"
                         android:textStyle="bold"
                         android:letterSpacing="0.1" />
@@ -73,7 +75,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0 Payments"
-                        android:textColor="#C7D2FE"
+                        android:textColor="@color/cm_nav_secondary"
                         android:textSize="14sp"
                         android:layout_marginTop="4dp" />
 
@@ -120,7 +122,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="₹0.00"
-                            android:textColor="#16A34A"
+                            android:textColor="@color/cm_teal"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -143,12 +145,54 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="₹0.00"
-                            android:textColor="#2563EB"
+                            android:textColor="@color/cm_blue"
                             android:textStyle="bold" />
                     </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/tvHandoverNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:padding="12dp"
+                android:text="@string/handover_pending_verification"
+                android:textColor="@color/accent_orange"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHandoverAction"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:text="@string/submit_collection_to_admin" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="@string/customers_to_collect"
+                android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+
+            <TextView
+                android:id="@+id/tvNoCollectibleCustomers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="20dp"
+                android:text="@string/no_collectible_customers"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvPendingCustomers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:layout_marginBottom="24dp"
+                tools:listitem="@layout/item_customer_card" />
 
             <!-- Recent Transactions -->
             <TextView

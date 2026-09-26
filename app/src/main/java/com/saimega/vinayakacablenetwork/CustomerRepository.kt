@@ -2,6 +2,7 @@ package com.saimega.vinayakacablenetwork
 
 import android.util.Log
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
@@ -55,143 +56,132 @@ class CustomerRepository {
             paymentStatus = paymentStatusRaw ?: statusVal ?: "Unpaid",
             connectionStatus = connStatus,
             deactivatedMonth = doc.getString("deactivatedMonth"),
+            reconnectedMonth = doc.getString("reconnectedMonth"),
             lastPaidMonth = doc.getString("lastPaidMonth") ?: "",
-            lastBilledMonth = doc.getString("lastBilledMonth") ?: ""
+            lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
+            joinMonth = doc.getString("joinMonth") ?: "",
+            vcNumber = doc.getString("vcNumber") ?: doc.getString("VC No") ?: "",
+            boxNumber = doc.getString("boxNumber") ?: doc.getString("STB/box No") ?: "",
+            crfNumber = doc.getString("crfNumber") ?: doc.getString("CRF No") ?: "",
+            address = doc.getString("address") ?: "",
+            packageId = doc.getString("packageId") ?: doc.getString("package") ?: ""
         )
     }
 
     suspend fun fetchFirstPage(status: String): PageResult {
-        // Fetch ALL customers locally because we calculate status on the client now
-        val snapshot = db.collection("customers")
-            .get(Source.SERVER)
-            .await()
-
+        val snapshot = db.collection("customers").get(Source.SERVER).await()
         val customers = snapshot.documents.map { mapDocToCustomer(it) }
-
-        // Apply local filtering
-        val filtered = customers.filter { c ->
-            if (status.equals("paid", true)) {
-                c.paymentStatus.equals("Paid", true)
-            } else {
-                c.paymentStatus.equals("Unpaid", true)
-            }
+        val filtered = when (status.lowercase()) {
+            "paid" -> customers.filter { it.paymentStatus.equals("paid", true) }
+            "unpaid" -> customers.filter { it.paymentStatus.equals("unpaid", true) }
+            "partial" -> customers.filter { it.status.equals("partial", true) }
+            else -> customers
         }
-
-        return PageResult(filtered, null) // null cursor means no more pages
+        return PageResult(filtered, null)
     }
 
-    suspend fun fetchNextPage(status: String, lastDocument: DocumentSnapshot): PageResult {
-        return PageResult(emptyList(), null)
-    }
-
-    // =========================
-    // SUBMIT PAYMENT
-    // =========================
+    suspend fun fetchNextPage(status: String, lastDocument: DocumentSnapshot): PageResult = PageResult(emptyList(), null)
 
     fun submitPayment(
         customer: CustomerModel,
         amountPaid: Double,
         paymentMode: String,
         paymentNumber: String,
-        onSuccess: () -> Unit,
+        extraCharges: Double,
+        collectorUsername: String,
+        remarks: String,
+        smsRequested: Boolean,
+        onSuccess: (String) -> Unit,
         onFailure: (Exception) -> Unit
     ) {
+        if (amountPaid <= 0.0 || extraCharges < 0.0) {
+            onFailure(IllegalArgumentException("Payment must be positive and extra charges cannot be negative"))
+            return
+        }
+
         val paymentRef = db.collection("payments").document()
         val now = System.currentTimeMillis()
         val dateString = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(now))
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(now))
-
-        val totalAmount = customer.baseAmount + customer.extraCharges
-        
-        val payment = PaymentModel(
-            paymentId = paymentRef.id,
-            customerId = customer.id,
-            name = customer.name,
-            baseAmount = customer.baseAmount,
-            extraCharges = customer.extraCharges,
-            total = totalAmount,
-            paid = amountPaid,
-            remaining = totalAmount - amountPaid, // Temporary purely for payment document parity
-            paymentMode = paymentMode,
-            paymentNumber = paymentNumber,
-            date = dateString,
-            timestamp = now
-        )
-
-        val billingRef = db.collection("billing")
-            .document(customer.id)
-            .collection("months")
-            .document(monthKey)
         val customerRef = db.collection("customers").document(customer.id)
+        val billingRef = db.collection("billing").document(customer.id).collection("months").document(monthKey)
+        val monthCounterRef = db.collection("receiptCounters").document(monthKey.replace("-", ""))
 
         db.runTransaction { transaction ->
-            // Fetch the customer document
             val customerSnapshot = transaction.get(customerRef)
             val billingSnapshot = transaction.get(billingRef)
-            
-            // Deduct the paymentAmount from the pendingAmount first.
-            val currentPending = (customerSnapshot.get("pendingAmount") as? Number)?.toDouble() ?: 0.0
-            val baseAmt = (customerSnapshot.get("baseAmount") as? Number)?.toDouble() ?: 0.0
-            
-            var newPending = currentPending - amountPaid
-            var remainingPayment = 0.0
-            
-            if (newPending < 0) {
-                remainingPayment = -newPending
-                newPending = 0.0
-            }
-            
-            var lastPaidMonth = customerSnapshot.getString("lastPaidMonth") ?: ""
-            var status = "unpaid"
-            
-            // If there is remaining payment left after pendingAmount reaches 0, 
-            // and the remainder is greater than or equal to the baseAmount, 
-            // update the lastPaidMonth to the current month
-            if (newPending == 0.0 && remainingPayment >= baseAmt) {
-                lastPaidMonth = monthKey
-            }
-            
-            // Classification Logic:
-            // PAID: lastPaidMonth is current month AND pendingAmount is 0
-            // PARTIAL: lastPaidMonth is current month BUT pendingAmount > 0 (or some payment made toward current)
-            // UNPAID: lastPaidMonth is NOT current month
-            
-            if (lastPaidMonth == monthKey) {
-                status = if (newPending == 0.0) "paid" else "partial"
-            } else {
-                status = "unpaid"
-            }
-            
-            transaction.update(customerRef, mapOf(
-                "pendingAmount" to newPending,
-                "lastPaidMonth" to lastPaidMonth,
-                "status" to status,
-                "paymentStatus" to status.replaceFirstChar { it.uppercase() },
-                "Connection Status" to "active" // Immediately reactivate on payment
-            ))
-            
-            val previousPaid = (billingSnapshot.get("paid") as? Number)?.toDouble() ?: 0.0
-            val newPaid = previousPaid + amountPaid
-            val remaining = totalAmount - newPaid
+            val counterSnapshot = transaction.get(monthCounterRef)
+            if (!customerSnapshot.exists()) throw IllegalStateException("Customer ${customer.id} not found")
 
-            val billingData = mapOf(
+            val baseAmount = (customerSnapshot.get("baseAmount") as? Number)?.toDouble() ?: 0.0
+            val currentPending = (customerSnapshot.get("pendingAmount") as? Number)?.toDouble() ?: baseAmount
+            val previousPaid = (billingSnapshot.get("paid") as? Number)?.toDouble() ?: 0.0
+            val monthlyBill = (billingSnapshot.get("bill") as? Number)?.toDouble()
+                ?: (customerSnapshot.get("monthlyCharge") as? Number)?.toDouble() ?: baseAmount
+            val previousOutstanding = (billingSnapshot.get("previousOutstanding") as? Number)?.toDouble()
+                ?: (currentPending - monthlyBill).coerceAtLeast(0.0)
+            val previousExtraCharges = (billingSnapshot.get("extraCharges") as? Number)?.toDouble() ?: 0.0
+            val paymentUpdate = BillingCycle.computePaymentBalance(
+                currentPending, extraCharges, amountPaid, monthKey,
+                customerSnapshot.getString("lastPaidMonth") ?: ""
+            )
+            val newPaid = previousPaid + amountPaid
+            val ledgerAmounts = BillingCycle.computeMonthlyLedgerAmounts(
+                previousOutstanding, monthlyBill, previousExtraCharges + extraCharges, newPaid
+            )
+            val sequence = ((counterSnapshot.get("lastSequence") as? Number)?.toInt() ?: 0) + 1
+            val receiptNumber = BillingCycle.formatReceiptNumber(monthKey, sequence)
+
+            transaction.update(customerRef, mapOf(
+                "pendingAmount" to paymentUpdate.pendingAmount,
+                "lastPaidMonth" to paymentUpdate.lastPaidMonth,
+                "status" to paymentUpdate.status,
+                "paymentStatus" to paymentUpdate.status.replaceFirstChar { it.uppercase() }
+            ))
+            transaction.set(paymentRef, PaymentModel(
+                paymentId = paymentRef.id,
+                customerId = customer.id,
+                name = customerSnapshot.getString("name") ?: customer.name,
+                teluguName = customerSnapshot.getString("telugu name") ?: customer.teluguName,
+                phone = customerSnapshot.getString("phone") ?: "",
+                vcNumber = customerSnapshot.getString("vcNumber") ?: customerSnapshot.getString("VC No") ?: customer.id,
+                packageName = customerSnapshot.getString("package") ?: customerSnapshot.getString("packageId") ?: "",
+                baseAmount = baseAmount,
+                billAmount = monthlyBill,
+                previousOutstanding = previousOutstanding,
+                alreadyPaid = previousPaid,
+                extraCharges = extraCharges,
+                total = ledgerAmounts.totalDue,
+                paid = amountPaid,
+                remaining = ledgerAmounts.remaining,
+                paymentMode = paymentMode,
+                paymentNumber = paymentNumber,
+                remarks = remarks.trim(),
+                smsRequested = smsRequested,
+                receiptNumber = receiptNumber,
+                collectorUsername = collectorUsername,
+                date = dateString,
+                timestamp = now
+            ))
+            transaction.set(billingRef, mapOf(
                 "customerId" to customer.id,
                 "name" to customer.name,
-                "total" to totalAmount,
+                "monthKey" to monthKey,
+                "bill" to monthlyBill,
+                "previousOutstanding" to previousOutstanding,
+                "extraCharges" to (previousExtraCharges + extraCharges),
+                "total" to ledgerAmounts.totalDue,
                 "paid" to newPaid,
-                "remaining" to remaining,
+                "remaining" to ledgerAmounts.remaining,
+                "isBillRevised" to (billingSnapshot.getBoolean("isBillRevised") ?: false),
+                "revisionReason" to (billingSnapshot.getString("revisionReason") ?: ""),
                 "timestamp" to now
-            )
-
-            transaction.set(paymentRef, payment)
-            transaction.set(billingRef, billingData, SetOptions.merge())
-            null
-        }.addOnSuccessListener {
-            Log.d("CustomerRepository", "Payment transaction completed successfully.")
-            onSuccess()
-        }.addOnFailureListener { e ->
-            onFailure(e)
-        }
+            ), SetOptions.merge())
+            transaction.set(monthCounterRef, mapOf("lastSequence" to sequence, "month" to monthKey), SetOptions.merge())
+            paymentRef.id
+        }.addOnSuccessListener { paymentId ->
+            onSuccess(paymentId)
+        }.addOnFailureListener(onFailure)
     }
 
     /**
@@ -224,7 +214,12 @@ class CustomerRepository {
                 val paymentMonthKey = (paymentSnapshot.getString("date") ?: "").take(7)
 
                 val customerRef = db.collection("customers").document(customerId)
+                val billingRef = db.collection("billing")
+                    .document(customerId)
+                    .collection("months")
+                    .document(paymentMonthKey)
                 val customerSnapshot = transaction.get(customerRef)
+                val billingSnapshot = transaction.get(billingRef)
                 val currentPending = (customerSnapshot.get("pendingAmount") as? Number)?.toDouble() ?: 0.0
                 val lastPaidMonth = customerSnapshot.getString("lastPaidMonth") ?: ""
 
@@ -249,6 +244,15 @@ class CustomerRepository {
                     "paymentMode" to newMode,
                     "paymentNumber" to newNumber
                 ))
+                if (billingSnapshot.exists()) {
+                    val ledgerTotal = (billingSnapshot.get("total") as? Number)?.toDouble() ?: 0.0
+                    val ledgerPaid = (billingSnapshot.get("paid") as? Number)?.toDouble() ?: 0.0
+                    val revisedPaid = (ledgerPaid + delta).coerceAtLeast(0.0)
+                    transaction.update(billingRef, mapOf(
+                        "paid" to revisedPaid,
+                        "remaining" to (ledgerTotal - revisedPaid)
+                    ))
+                }
                 null
             }.await()
             true
@@ -273,9 +277,22 @@ class CustomerRepository {
         return try {
             val metaRef = db.collection("meta").document("billing")
             val metaSnap = metaRef.get(Source.SERVER).await()
-            if (metaSnap.getString("lastGeneratedMonth") == monthKey) {
+            val monthFormat = SimpleDateFormat("yyyy-MM", Locale.US)
+            val targetDate = monthFormat.parse(monthKey) ?: throw IllegalArgumentException("Month must use yyyy-MM")
+            val currentMonth = monthFormat.format(Date())
+            if (monthKey < "2026-04" || monthKey > currentMonth) {
+                throw IllegalArgumentException("Billing month must be between April 2026 and the current month")
+            }
+            val backfillVersion = (metaSnap.get("ledgerBackfillVersion") as? Number)?.toInt() ?: 0
+            if (metaSnap.getString("lastGeneratedMonth") == monthKey && backfillVersion >= 1) {
                 return BillingRunResult.AlreadyRun
             }
+            val lastGeneratedMonth = metaSnap.getString("lastGeneratedMonth")
+            if (lastGeneratedMonth != null && monthKey < lastGeneratedMonth) {
+                throw IllegalArgumentException("Cannot generate an earlier month after a later billing run")
+            }
+
+            BillingLedgerBackfill(db).backfillBefore(monthKey)
 
             // Fetch all and filter client-side (not whereEqualTo): many customer
             // documents (e.g. anything created via NewCustomerActivity) have no
@@ -292,22 +309,70 @@ class CustomerRepository {
                     id = doc.id,
                     connectionStatus = doc.getString("Connection Status") ?: "active",
                     pendingAmount = (doc.get("pendingAmount") as? Number)?.toDouble() ?: 0.0,
-                    monthlyCharge = (doc.get("monthlyCharge") as? Number)?.toDouble() ?: 0.0
+                    monthlyCharge = (doc.get("monthlyCharge") as? Number)?.toDouble()
+                        ?: (doc.get("baseAmount") as? Number)?.toDouble() ?: 0.0,
+                    lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
+                    joinedMonth = doc.getString("joinMonth") ?: "",
+                    deactivatedMonth = doc.getString("deactivatedMonth"),
+                    reconnectedMonth = doc.getString("reconnectedMonth")
                 )
             }
 
-            val updates = BillingCycle.computeMonthlyBillUpdates(states)
+            val updates = BillingCycle.computeMonthlyBillUpdates(states, monthKey)
+            val inactiveWithoutLedger = states.filter { state ->
+                state.lastBilledMonth != monthKey && !BillingCycle.isActiveForMonth(state, monthKey)
+            }
 
-            updates.chunked(500).forEach { chunk ->
+            updates.chunked(250).forEach { chunk ->
                 val batch = db.batch()
                 for (update in chunk) {
-                    val ref = db.collection("customers").document(update.id)
-                    batch.update(ref, mapOf(
+                    val customerRef = db.collection("customers").document(update.id)
+                    val ledgerRef = db.collection("billing")
+                        .document(update.id)
+                        .collection("months")
+                        .document(monthKey)
+                    batch.update(customerRef, mapOf(
                         "pendingAmount" to update.newPendingAmount,
                         "lastBilledMonth" to monthKey,
                         "status" to "unpaid",
                         "paymentStatus" to "Unpaid"
                     ))
+                    batch.set(ledgerRef, mapOf(
+                        "customerId" to update.id,
+                        "monthKey" to monthKey,
+                        "bill" to update.monthlyBill,
+                        "extraCharges" to 0.0,
+                        "previousOutstanding" to update.previousOutstanding,
+                        "paid" to 0.0,
+                        "total" to update.newPendingAmount,
+                        "remaining" to update.newPendingAmount,
+                        "isBillRevised" to false,
+                        "timestamp" to System.currentTimeMillis()
+                    ), SetOptions.merge())
+                }
+                batch.commit().await()
+            }
+
+            inactiveWithoutLedger.chunked(500).forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { state ->
+                    val ledgerRef = db.collection("billing")
+                        .document(state.id)
+                        .collection("months")
+                        .document(monthKey)
+                    val previousOutstanding = state.pendingAmount.coerceAtLeast(0.0)
+                    batch.set(ledgerRef, mapOf(
+                        "customerId" to state.id,
+                        "monthKey" to monthKey,
+                        "bill" to 0.0,
+                        "extraCharges" to 0.0,
+                        "previousOutstanding" to previousOutstanding,
+                        "paid" to 0.0,
+                        "total" to previousOutstanding,
+                        "remaining" to previousOutstanding,
+                        "isBillRevised" to false,
+                        "timestamp" to System.currentTimeMillis()
+                    ), SetOptions.merge())
                 }
                 batch.commit().await()
             }
@@ -315,7 +380,8 @@ class CustomerRepository {
             metaRef.set(
                 mapOf(
                     "lastGeneratedMonth" to monthKey,
-                    "lastGeneratedAt" to System.currentTimeMillis()
+                    "lastGeneratedAt" to System.currentTimeMillis(),
+                    "ledgerBackfillVersion" to 1
                 ),
                 SetOptions.merge()
             ).await()
@@ -326,53 +392,159 @@ class CustomerRepository {
         }
     }
 
-    /**
-     * Grace-period connection-status sweep: deactivates customers who haven't
-     * paid within their grace window, and (re)marks each customer's "status"
-     * paid/unpaid for the current month based on lastPaidMonth.
-     *
-     * Grace rule: 1st–10th of the month, a customer stays active if they paid
-     * last month OR this month; from the 11th on, active requires having paid
-     * this month.
-     *
-     * Idempotent per calendar day via meta/billing.lastStatusCheckDate — safe
-     * to call from anywhere (e.g. dashboard onResume) without re-scanning/
-     * rewriting every customer on every call.
-     */
-    suspend fun refreshConnectionStatuses(): Int {
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val metaRef = db.collection("meta").document("billing")
-        val metaSnap = metaRef.get(Source.SERVER).await()
-        if (metaSnap.getString("lastStatusCheckDate") == today) {
-            return 0
-        }
-
-        val cal = Calendar.getInstance()
-        val currentDay = cal.get(Calendar.DAY_OF_MONTH)
-        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-        val currentMonth = sdf.format(cal.time)
-        val calLast = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
-        val lastMonth = sdf.format(calLast.time)
-
-        val snapshot = db.collection("customers").get(Source.SERVER).await()
-
-        var updatedCount = 0
-        snapshot.documents.chunked(500).forEach { chunk ->
-            val batch = db.batch()
-            for (doc in chunk) {
-                val lastPaid = doc.getString("lastPaidMonth") ?: ""
-                val update = BillingCycle.computeConnectionStatus(currentDay, lastPaid, currentMonth, lastMonth)
-                batch.update(doc.reference, mapOf(
-                    "status" to update.status,
-                    "Connection Status" to update.connectionStatus
-                ))
-                updatedCount++
+    suspend fun setConnectionStatus(customerId: String, active: Boolean, monthKey: String): Boolean {
+        return try {
+            val changes = if (active) {
+                mapOf("Connection Status" to "active", "reconnectedMonth" to monthKey)
+            } else {
+                mapOf(
+                    "Connection Status" to "deactivated",
+                    "deactivatedMonth" to monthKey,
+                    "reconnectedMonth" to FieldValue.delete()
+                )
             }
-            batch.commit().await()
+            db.collection("customers").document(customerId).update(changes).await()
+            true
+        } catch (e: Exception) {
+            false
         }
+    }
 
-        metaRef.set(mapOf("lastStatusCheckDate" to today), SetOptions.merge()).await()
-        return updatedCount
+    suspend fun reviseMonthlyBill(customerId: String, monthKey: String, newBill: Double, reason: String): Boolean {
+        if (newBill < 0.0 || reason.isBlank()) return false
+        val currentMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        if (monthKey != currentMonth) return false
+
+        return try {
+            val customerRef = db.collection("customers").document(customerId)
+            val ledgerRef = db.collection("billing")
+                .document(customerId)
+                .collection("months")
+                .document(monthKey)
+            db.runTransaction { transaction ->
+                val customerSnapshot = transaction.get(customerRef)
+                val ledgerSnapshot = transaction.get(ledgerRef)
+                if (!customerSnapshot.exists()) throw IllegalStateException("Customer not found")
+                val currentPending = (customerSnapshot.get("pendingAmount") as? Number)?.toDouble() ?: 0.0
+                val oldBill = (ledgerSnapshot.get("bill") as? Number)?.toDouble()
+                    ?: (customerSnapshot.get("monthlyCharge") as? Number)?.toDouble()
+                    ?: (customerSnapshot.get("baseAmount") as? Number)?.toDouble() ?: 0.0
+                val previousOutstanding = (ledgerSnapshot.get("previousOutstanding") as? Number)?.toDouble()
+                    ?: (currentPending - oldBill).coerceAtLeast(0.0)
+                val extraCharges = (ledgerSnapshot.get("extraCharges") as? Number)?.toDouble() ?: 0.0
+                val paid = (ledgerSnapshot.get("paid") as? Number)?.toDouble() ?: 0.0
+                val update = BillingCycle.computeBillRevision(
+                    currentPending = currentPending,
+                    previousOutstanding = previousOutstanding,
+                    oldBill = oldBill,
+                    newBill = newBill,
+                    extraCharges = extraCharges,
+                    paid = paid
+                )
+                val status = when {
+                    update.pendingAmount == 0.0 -> "paid"
+                    paid > 0.0 -> "partial"
+                    else -> "unpaid"
+                }
+                val lastPaidMonth = if (update.pendingAmount == 0.0) monthKey
+                else customerSnapshot.getString("lastPaidMonth") ?: ""
+                transaction.update(customerRef, mapOf(
+                    "pendingAmount" to update.pendingAmount,
+                    "lastPaidMonth" to lastPaidMonth,
+                    "status" to status,
+                    "paymentStatus" to status.replaceFirstChar { it.uppercase() }
+                ))
+                transaction.set(ledgerRef, mapOf(
+                    "customerId" to customerId,
+                    "monthKey" to monthKey,
+                    "bill" to newBill,
+                    "previousOutstanding" to previousOutstanding,
+                    "extraCharges" to extraCharges,
+                    "paid" to paid,
+                    "total" to update.totalDue,
+                    "remaining" to update.remaining,
+                    "isBillRevised" to true,
+                    "revisionReason" to reason.trim(),
+                    "billRevisedAt" to System.currentTimeMillis()
+                ), SetOptions.merge())
+                null
+            }.await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun fetchMonthlyLedger(customerId: String): List<MonthlyLedgerEntry> {
+        val snapshot = db.collection("billing").document(customerId)
+            .collection("months").get(Source.SERVER).await()
+        return snapshot.documents.map { doc ->
+            MonthlyLedgerEntry(
+                monthKey = doc.getString("monthKey") ?: doc.id,
+                bill = (doc.get("bill") as? Number)?.toDouble() ?: (doc.get("total") as? Number)?.toDouble() ?: 0.0,
+                extraCharges = (doc.get("extraCharges") as? Number)?.toDouble() ?: 0.0,
+                previousOutstanding = (doc.get("previousOutstanding") as? Number)?.toDouble() ?: 0.0,
+                paid = (doc.get("paid") as? Number)?.toDouble() ?: 0.0,
+                balance = (doc.get("remaining") as? Number)?.toDouble() ?: 0.0,
+                isRevised = doc.getBoolean("isBillRevised") ?: false,
+                revisionReason = doc.getString("revisionReason") ?: ""
+            )
+        }.sortedByDescending { it.monthKey }
+    }
+
+    suspend fun fetchTotalOutstanding(): Double {
+        val snapshot = db.collection("customers").get(Source.SERVER).await()
+        return snapshot.documents.sumOf {
+            ((it.get("pendingAmount") as? Number)?.toDouble() ?: 0.0).coerceAtLeast(0.0)
+        }
+    }
+
+    suspend fun fetchCustomerMonthStatuses(monthKey: String): Map<String, CustomerMonthStatus> {
+        val snapshot = db.collectionGroup("months").get(Source.SERVER).await()
+        return snapshot.documents.filter { (it.getString("monthKey") ?: it.id) == monthKey }.mapNotNull { doc ->
+            val customerId = doc.reference.parent.parent?.id ?: doc.getString("customerId") ?: return@mapNotNull null
+            val bill = (doc.get("bill") as? Number)?.toDouble() ?: (doc.get("total") as? Number)?.toDouble() ?: 0.0
+            val extra = (doc.get("extraCharges") as? Number)?.toDouble() ?: 0.0
+            val previous = (doc.get("previousOutstanding") as? Number)?.toDouble() ?: 0.0
+            val paid = (doc.get("paid") as? Number)?.toDouble() ?: 0.0
+            val total = (doc.get("total") as? Number)?.toDouble() ?: bill + extra + previous
+            customerId to CustomerMonthStatus(
+                status = BillingCycle.monthlyPaymentStatus(total, paid),
+                bill = bill,
+                extraCharges = extra,
+                previousOutstanding = previous,
+                paid = paid,
+                remaining = (doc.get("remaining") as? Number)?.toDouble() ?: (total - paid)
+            )
+        }.toMap()
+    }
+
+    suspend fun fetchCollectibleCustomers(monthKey: String): List<CustomerModel> {
+        val customers = db.collection("customers").get(Source.SERVER).await().documents
+        val monthStatuses = fetchCustomerMonthStatuses(monthKey)
+        return customers.mapNotNull { doc ->
+            val customer = mapDocToCustomer(doc)
+            val state = CustomerBillingState(
+                id = customer.id,
+                connectionStatus = customer.connectionStatus,
+                pendingAmount = customer.pendingAmount,
+                monthlyCharge = customer.monthlyCharge,
+                lastBilledMonth = customer.lastBilledMonth,
+                joinedMonth = customer.joinMonth,
+                deactivatedMonth = customer.deactivatedMonth,
+                reconnectedMonth = customer.reconnectedMonth
+            )
+            if (!BillingCycle.isActiveForMonth(state, monthKey)) return@mapNotNull null
+            val monthStatus = monthStatuses[customer.id]
+            val status = monthStatus?.status ?: customer.status.lowercase()
+            val remaining = monthStatus?.remaining ?: customer.pendingAmount
+            if (status !in listOf("unpaid", "partial") || remaining <= 0.0) return@mapNotNull null
+            customer.copy(
+                status = status,
+                paymentStatus = status.replaceFirstChar { it.uppercase() },
+                pendingAmount = remaining
+            )
+        }.sortedByDescending { it.pendingAmount }
     }
 
     /**
@@ -559,10 +731,36 @@ class CustomerRepository {
      * would wipe billing state (pendingAmount, status, lastPaidMonth, etc.)
      * that this edit form never touches.
      */
-    suspend fun updateCustomer(id: String, name: String, phone: String, baseAmount: Double): Boolean {
+    suspend fun updateCustomer(
+        id: String,
+        name: String,
+        phone: String,
+        baseAmount: Double,
+        teluguName: String,
+        vcNumber: String,
+        boxNumber: String,
+        crfNumber: String,
+        address: String,
+        packageName: String
+    ): Boolean {
         return try {
             db.collection("customers").document(id)
-                .update(mapOf("name" to name, "phone" to phone, "baseAmount" to baseAmount))
+                .update(mapOf(
+                    "name" to name,
+                    "phone" to phone,
+                    "baseAmount" to baseAmount,
+                    "monthlyCharge" to baseAmount,
+                    "telugu name" to teluguName,
+                    "vcNumber" to vcNumber,
+                    "VC No" to vcNumber,
+                    "boxNumber" to boxNumber,
+                    "STB/box No" to boxNumber,
+                    "crfNumber" to crfNumber,
+                    "CRF No" to crfNumber,
+                    "address" to address,
+                    "package" to packageName,
+                    "packageId" to packageName
+                ))
                 .await()
             true
         } catch (e: Exception) {

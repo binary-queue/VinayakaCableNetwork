@@ -6,40 +6,40 @@
     <style name="Base.Theme.VinayakaCableNetwork" parent="Theme.Material3.DayNight.NoActionBar">
 
         <!-- Primary (Blue) -->
-        <item name="colorPrimary">#1E88E5</item>
+        <item name="colorPrimary">@color/cm_blue</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#D6E8FC</item>
-        <item name="colorOnPrimaryContainer">#003566</item>
+        <item name="colorPrimaryContainer">#DFEDF6</item>
+        <item name="colorOnPrimaryContainer">#062A42</item>
 
         <!-- Secondary (Green) -->
-        <item name="colorSecondary">#43A047</item>
+        <item name="colorSecondary">@color/cm_teal</item>
         <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#C8E6C9</item>
-        <item name="colorOnSecondaryContainer">#1B5E20</item>
+        <item name="colorSecondaryContainer">#DCF3E8</item>
+        <item name="colorOnSecondaryContainer">#0B2A20</item>
 
         <!-- Tertiary (Teal/Cyan accent) -->
-        <item name="colorTertiary">#00838F</item>
+        <item name="colorTertiary">@color/cm_amber</item>
         <item name="colorOnTertiary">#FFFFFF</item>
-        <item name="colorTertiaryContainer">#B2EBF2</item>
-        <item name="colorOnTertiaryContainer">#004D56</item>
+        <item name="colorTertiaryContainer">#FCEFD9</item>
+        <item name="colorOnTertiaryContainer">#31230B</item>
 
         <!-- Error (Red) -->
-        <item name="colorError">#B00020</item>
+        <item name="colorError">@color/cm_coral</item>
         <item name="colorOnError">#FFFFFF</item>
-        <item name="colorErrorContainer">#FFCDD2</item>
-        <item name="colorOnErrorContainer">#7F0000</item>
+        <item name="colorErrorContainer">#FBE4E8</item>
+        <item name="colorOnErrorContainer">#320F18</item>
 
         <!-- Surface / Background -->
-        <item name="colorSurface">#FFFFFF</item>
-        <item name="colorOnSurface">#1A1C1E</item>
-        <item name="colorSurfaceVariant">#F5F5F5</item>
-        <item name="colorOnSurfaceVariant">#44474F</item>
-        <item name="android:colorBackground">#F5F7FA</item>
-        <item name="colorOnBackground">#1A1C1E</item>
+        <item name="colorSurface">@color/cm_card</item>
+        <item name="colorOnSurface">@color/cm_text_primary</item>
+        <item name="colorSurfaceVariant">@color/cm_card2</item>
+        <item name="colorOnSurfaceVariant">@color/cm_text_secondary</item>
+        <item name="android:colorBackground">@color/cm_bg</item>
+        <item name="colorOnBackground">@color/cm_text_primary</item>
 
         <!-- Outline -->
-        <item name="colorOutline">#74777F</item>
-        <item name="colorOutlineVariant">#C4C6D0</item>
+        <item name="colorOutline">#8494A8</item>
+        <item name="colorOutlineVariant">@color/cm_border</item>
 
     </style>
 

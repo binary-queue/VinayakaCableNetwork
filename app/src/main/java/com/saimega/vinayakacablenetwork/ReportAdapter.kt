@@ -1,10 +1,10 @@
 package com.saimega.vinayakacablenetwork
 
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 
 /**
@@ -52,18 +52,19 @@ class ReportAdapter(
         val p = list[position]
 
         // Name
-        holder.tvName.text = p.name.ifEmpty { "—" }
+        val displayName = if (LocaleHelper.getLanguage(holder.itemView.context) == "te" && p.teluguName.isNotBlank()) p.teluguName else p.name
+        holder.tvName.text = displayName.ifEmpty { "—" }
 
         // Series (customerId)
         holder.tvSeries.text = holder.itemView.context.getString(R.string.series_format, p.customerId.ifEmpty { "N/A" })
 
-        // Paid amount — bold green for Cash, blue for UPI
+        // Paid amount — mint for Cash, blue for digital payments
         holder.tvAmount.text = holder.itemView.context.getString(R.string.rupee_value, p.paid.toLong().toString())
         holder.tvAmount.setTextColor(
             if (p.paymentMode.equals("Cash", ignoreCase = true))
-                Color.parseColor("#2E7D32")   // green
+                ContextCompat.getColor(holder.itemView.context, R.color.cm_teal)
             else
-                Color.parseColor("#1565C0")   // blue
+                ContextCompat.getColor(holder.itemView.context, R.color.cm_blue)
         )
 
         // Payment mode + optional reference number

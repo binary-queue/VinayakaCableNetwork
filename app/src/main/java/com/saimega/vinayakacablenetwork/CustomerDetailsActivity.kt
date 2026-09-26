@@ -2,6 +2,7 @@ package com.saimega.vinayakacablenetwork
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -43,20 +44,31 @@ class CustomerDetailsActivity : BaseActivity() {
     private lateinit var etAmountPaid: EditText
     private lateinit var spPaymentMode: AutoCompleteTextView
     private lateinit var etPaymentNumber: EditText
+    private lateinit var etRemarks: EditText
     private lateinit var tilPaymentNumber: View
+    private lateinit var switchSmsReceipt: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var tvUpiLabel: TextView
 
     private lateinit var btnSubmit: Button
+    private lateinit var btnPayFull: com.google.android.material.button.MaterialButton
+    private lateinit var btnPayBillOnly: com.google.android.material.button.MaterialButton
+    private lateinit var btnPayHalf: com.google.android.material.button.MaterialButton
     private lateinit var btnViewReceipt: Button
     private lateinit var btnDownloadInvoice: Button
     private lateinit var btnShareWhatsapp: Button
     private lateinit var btnViewHistory: Button
+    private lateinit var btnViewLedger: Button
+    private lateinit var btnCallCustomer: com.google.android.material.button.MaterialButton
+    private lateinit var btnCustomerWhatsapp: com.google.android.material.button.MaterialButton
 
     private lateinit var rowEditDelete: View
     private lateinit var btnEditCustomer: Button
     private lateinit var btnDeleteCustomer: Button
+    private lateinit var btnToggleConnection: com.google.android.material.button.MaterialButton
+    private lateinit var btnReviseBill: com.google.android.material.button.MaterialButton
 
     private var currentCustomer: CustomerModel? = null
+    private lateinit var viewedMonthKey: String
     private val repository = CustomerRepository()
     private val auditLogRepository = AuditLogRepository()
     private val db = FirebaseFirestore.getInstance()
@@ -75,6 +87,8 @@ class CustomerDetailsActivity : BaseActivity() {
         applyImeInsetPadding()
 
         val series = intent.getStringExtra("seriesNumber") ?: ""
+        viewedMonthKey = intent.getStringExtra("MONTH_KEY")
+            ?: java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
         val passedCustomer = intent.getSerializableExtra("customerModel") as? CustomerModel
 
         if (passedCustomer != null) {
@@ -121,23 +135,68 @@ class CustomerDetailsActivity : BaseActivity() {
         etAmountPaid = findViewById(R.id.etAmountPaid)
         spPaymentMode = findViewById(R.id.spPaymentMode)
         etPaymentNumber = findViewById(R.id.etPaymentNumber)
+        etRemarks = findViewById(R.id.etRemarks)
         tilPaymentNumber = findViewById(R.id.tilPaymentNumber)
+        switchSmsReceipt = findViewById(R.id.switchSmsReceipt)
         tvUpiLabel = findViewById(R.id.tvUpiLabel)
 
         btnSubmit = findViewById(R.id.btnSubmitPayment)
+        btnPayFull = findViewById(R.id.btnPayFull)
+        btnPayBillOnly = findViewById(R.id.btnPayBillOnly)
+        btnPayHalf = findViewById(R.id.btnPayHalf)
         btnViewReceipt = findViewById(R.id.btnViewReceipt)
         btnDownloadInvoice = findViewById(R.id.btnDownloadInvoice)
         btnShareWhatsapp = findViewById(R.id.btnShareWhatsapp)
         btnViewHistory = findViewById(R.id.btnViewHistory)
+        btnViewLedger = findViewById(R.id.btnViewLedger)
+        btnCallCustomer = findViewById(R.id.btnCallCustomer)
+        btnCustomerWhatsapp = findViewById(R.id.btnCustomerWhatsapp)
 
         rowEditDelete = findViewById(R.id.rowEditDelete)
         btnEditCustomer = findViewById(R.id.btnEditCustomer)
         btnDeleteCustomer = findViewById(R.id.btnDeleteCustomer)
+        btnToggleConnection = findViewById(R.id.btnToggleConnection)
+        btnReviseBill = findViewById(R.id.btnReviseBill)
     }
 
     private fun setupEditDelete() {
         val role = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE).getString("user_role", Roles.EMPLOYEE) ?: Roles.EMPLOYEE
         rowEditDelete.visibility = if (role == Roles.ADMIN) View.VISIBLE else View.GONE
+        btnToggleConnection.visibility = if (role == Roles.ADMIN) View.VISIBLE else View.GONE
+        btnReviseBill.visibility = if (role == Roles.ADMIN) View.VISIBLE else View.GONE
+
+        btnToggleConnection.setOnClickListener {
+            val customer = currentCustomer ?: return@setOnClickListener
+            val reconnect = !isActiveForViewedMonth(customer)
+            val parsedMonth = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).parse(viewedMonthKey)
+            val monthLabel = parsedMonth?.let {
+                java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(it)
+            } ?: viewedMonthKey
+            AlertDialog.Builder(this)
+                .setTitle(getString(if (reconnect) R.string.reconnect_connection else R.string.deactivate_connection))
+                .setMessage(getString(
+                    if (reconnect) R.string.reconnect_connection_confirmation else R.string.deactivate_connection_confirmation,
+                    customer.name,
+                    monthLabel
+                ))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(if (reconnect) R.string.reconnect_connection else R.string.deactivate_connection) { _, _ ->
+                    lifecycleScope.launch {
+                        val updated = repository.setConnectionStatus(customer.id, reconnect, viewedMonthKey)
+                        if (updated) {
+                            Toast.makeText(this@CustomerDetailsActivity, R.string.connection_status_updated, Toast.LENGTH_SHORT).show()
+                            fetchCustomer(customer.id)
+                        } else {
+                            Toast.makeText(this@CustomerDetailsActivity, getString(R.string.error_prefix, "connection update failed"), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .show()
+        }
+
+            btnReviseBill.setOnClickListener {
+                currentCustomer?.let(::showBillRevisionDialog)
+            }
 
         btnEditCustomer.setOnClickListener {
             val customer = currentCustomer ?: return@setOnClickListener
@@ -177,6 +236,49 @@ class CustomerDetailsActivity : BaseActivity() {
         }
     }
 
+    private fun showBillRevisionDialog(customer: CustomerModel) {
+        val now = java.util.Date()
+        val monthKey = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(now)
+        val monthLabel = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(now)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 8, 48, 0)
+        }
+        val amountInput = EditText(this).apply {
+            hint = getString(R.string.revised_bill_amount)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(customer.monthlyCharge.toString())
+        }
+        val reasonInput = EditText(this).apply {
+            hint = getString(R.string.bill_revision_reason)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        content.addView(amountInput)
+        content.addView(reasonInput)
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.revise_bill_title, monthLabel))
+            .setView(content)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val revisedAmount = amountInput.text.toString().toDoubleOrNull()
+                val reason = reasonInput.text.toString().trim()
+                if (revisedAmount == null || revisedAmount < 0.0 || reason.isBlank()) {
+                    Toast.makeText(this, R.string.bill_revision_reason_required, Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                lifecycleScope.launch {
+                    if (repository.reviseMonthlyBill(customer.id, monthKey, revisedAmount, reason)) {
+                        Toast.makeText(this@CustomerDetailsActivity, R.string.bill_revised, Toast.LENGTH_SHORT).show()
+                        fetchCustomer(customer.id)
+                    } else {
+                        Toast.makeText(this@CustomerDetailsActivity, getString(R.string.error_prefix, "bill revision failed"), Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .show()
+    }
+
     private fun setupListeners() {
         // Extra Charges also re-syncs Amount Paid to the new total — so the
         // field starts pre-filled with what's actually owed instead of
@@ -195,6 +297,30 @@ class CustomerDetailsActivity : BaseActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
+
+        btnPayFull.setOnClickListener {
+            currentCustomer?.let { customer ->
+                setPaymentAmount(customer.pendingAmount + (etManualAmount.text.toString().toDoubleOrNull() ?: 0.0))
+            }
+        }
+        btnPayHalf.setOnClickListener {
+            currentCustomer?.let { customer ->
+                setPaymentAmount((customer.pendingAmount + (etManualAmount.text.toString().toDoubleOrNull() ?: 0.0)) / 2.0)
+            }
+        }
+        btnPayBillOnly.setOnClickListener {
+            val customer = currentCustomer ?: return@setOnClickListener
+            lifecycleScope.launch {
+                val monthKey = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+                val currentLedger = repository.fetchMonthlyLedger(customer.id).firstOrNull { it.monthKey == monthKey }
+                val billRemaining = if (currentLedger != null) {
+                    (currentLedger.bill - currentLedger.paid).coerceAtLeast(0.0)
+                } else {
+                    customer.monthlyCharge.takeIf { it > 0.0 } ?: customer.baseAmount
+                }
+                setPaymentAmount(billRemaining + (etManualAmount.text.toString().toDoubleOrNull() ?: 0.0))
+            }
+        }
 
         btnSubmit.setOnClickListener {
             handlePayment()
@@ -225,13 +351,54 @@ class CustomerDetailsActivity : BaseActivity() {
             intent.putExtra("CUSTOMER_ID", currentCustomer?.id)
             startActivity(intent)
         }
+        btnViewLedger.setOnClickListener {
+            val customer = currentCustomer ?: return@setOnClickListener
+            startActivity(Intent(this, MonthlyLedgerActivity::class.java).apply {
+                putExtra("CUSTOMER_ID", customer.id)
+                putExtra("CUSTOMER_NAME", customer.name)
+            })
+        }
+        btnCallCustomer.setOnClickListener {
+            val phone = currentCustomer?.phone.orEmpty()
+            if (phone.isBlank()) {
+                Toast.makeText(this, R.string.customer_phone_missing, Toast.LENGTH_SHORT).show()
+            } else {
+                startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+            }
+        }
+        btnCustomerWhatsapp.setOnClickListener {
+            val customer = currentCustomer ?: return@setOnClickListener
+            val digits = customer.phone.filter(Char::isDigit)
+            if (digits.isBlank()) {
+                Toast.makeText(this, R.string.customer_phone_missing, Toast.LENGTH_SHORT).show()
+            } else {
+                val whatsappPhone = if (digits.length == 10) "91$digits" else digits
+                val message = getString(
+                    R.string.customer_whatsapp_greeting,
+                    customer.displayName(LocaleHelper.getLanguage(this))
+                )
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$whatsappPhone?text=${Uri.encode(message)}")))
+            }
+        }
     }
 
     private fun fetchCustomer(series: String) {
         db.collection("customers").document(series).get()
             .addOnSuccessListener { doc ->
                 if (doc.exists()) {
-                    currentCustomer = doc.toObject(CustomerModel::class.java)?.copy(id = doc.id)
+                    currentCustomer = doc.toObject(CustomerModel::class.java)?.copy(
+                        id = doc.id,
+                        teluguName = doc.getString("telugu name") ?: doc.getString("teluguName") ?: "",
+                        connectionStatus = doc.getString("Connection Status") ?: "active",
+                        deactivatedMonth = doc.getString("deactivatedMonth"),
+                        reconnectedMonth = doc.getString("reconnectedMonth"),
+                        lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
+                        vcNumber = doc.getString("vcNumber") ?: doc.getString("VC No") ?: "",
+                        boxNumber = doc.getString("boxNumber") ?: doc.getString("STB/box No") ?: "",
+                        crfNumber = doc.getString("crfNumber") ?: doc.getString("CRF No") ?: "",
+                        address = doc.getString("address") ?: "",
+                        packageId = doc.getString("packageId") ?: doc.getString("package") ?: ""
+                    )
                     bindCustomerData()
                 }
             }
@@ -239,9 +406,13 @@ class CustomerDetailsActivity : BaseActivity() {
 
     private fun bindCustomerData() {
         val c = currentCustomer ?: return
-        tvName.text = c.name
+        btnToggleConnection.text = getString(
+            if (isActiveForViewedMonth(c)) R.string.deactivate_connection else R.string.reconnect_connection
+        )
+        val displayName = c.displayName(LocaleHelper.getLanguage(this))
+        tvName.text = displayName
         tvSeries.text = getString(R.string.customer_id_format, c.id)
-        tvAvatarInitial.text = c.name.firstOrNull()?.toString()?.uppercase() ?: "?"
+        tvAvatarInitial.text = displayName.firstOrNull()?.toString()?.uppercase() ?: "?"
         
         chipStatus.text = c.connectionStatus.uppercase()
         if (c.connectionStatus.equals("active", true)) {
@@ -274,6 +445,19 @@ class CustomerDetailsActivity : BaseActivity() {
 
         calculateFinalBill()
     }
+
+    private fun isActiveForViewedMonth(customer: CustomerModel): Boolean = BillingCycle.isActiveForMonth(
+        CustomerBillingState(
+            id = customer.id,
+            connectionStatus = customer.connectionStatus,
+            pendingAmount = customer.pendingAmount,
+            monthlyCharge = customer.monthlyCharge,
+            lastBilledMonth = customer.lastBilledMonth,
+            deactivatedMonth = customer.deactivatedMonth,
+            reconnectedMonth = customer.reconnectedMonth
+        ),
+        viewedMonthKey
+    )
 
     /** Sets Amount Paid to Base + Arrears + Extra Charges (the current total due). */
     private fun syncAmountPaidToTotal() {
@@ -338,8 +522,17 @@ class CustomerDetailsActivity : BaseActivity() {
             amountPaid = paid,
             paymentMode = spPaymentMode.text.toString(),
             paymentNumber = etPaymentNumber.text.toString(),
-            onSuccess = {
+            extraCharges = etManualAmount.text.toString().toDoubleOrNull() ?: 0.0,
+            collectorUsername = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE)
+                .getString("username", "") ?: "",
+            remarks = etRemarks.text?.toString().orEmpty(),
+            smsRequested = switchSmsReceipt.isChecked,
+            onSuccess = { paymentId ->
                 Toast.makeText(this, getString(R.string.payment_successful), Toast.LENGTH_SHORT).show()
+                startActivity(Intent(this, ReceiptActivity::class.java).apply {
+                    putExtra("CUSTOMER_ID", c.id)
+                    putExtra("PAYMENT_ID", paymentId)
+                })
                 finish()
             },
             onFailure = { e ->
@@ -350,19 +543,26 @@ class CustomerDetailsActivity : BaseActivity() {
     }
 
     private fun setupPaymentMode() {
-        val modes = listOf("Cash", "PhonePe", "Google Pay", "Paytm", "UPI")
+        val modes = listOf("Cash", "PhonePe", "UPI", "Card", "Cheque", "Other")
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, modes)
         spPaymentMode.setAdapter(adapter)
         spPaymentMode.setText("Cash", false)
 
         spPaymentMode.setOnItemClickListener { _, _, position, _ ->
             val selected = modes[position]
-            if (selected != "Cash") {
-                tilPaymentNumber.visibility = View.VISIBLE
-            } else {
-                tilPaymentNumber.visibility = View.GONE
+            val requiresPayerNumber = selected == "PhonePe" || selected == "UPI"
+            tilPaymentNumber.visibility = if (requiresPayerNumber) View.VISIBLE else View.GONE
+            if (!requiresPayerNumber) {
+                etPaymentNumber.text.clear()
             }
         }
+    }
+
+    private fun setPaymentAmount(amount: Double) {
+        val formatted = if (amount == amount.toLong().toDouble()) amount.toLong().toString()
+        else String.format(java.util.Locale.US, "%.2f", amount)
+        etAmountPaid.setText(formatted)
+        etAmountPaid.setSelection(formatted.length)
     }
 
     /**

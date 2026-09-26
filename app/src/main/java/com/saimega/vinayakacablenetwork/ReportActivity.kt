@@ -1,6 +1,7 @@
 package com.saimega.vinayakacablenetwork
 
 import android.content.Intent
+import android.content.ClipData
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
@@ -12,6 +13,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -42,11 +44,16 @@ class ReportActivity : BaseActivity() {
     private lateinit var tvReportTitle : TextView
     private lateinit var tvTotal       : TextView
     private lateinit var tvCount       : TextView
+    private lateinit var tvOutstanding : TextView
+    private lateinit var tvCollectorReportTitle: TextView
+    private lateinit var collectorReportContainer: android.widget.LinearLayout
     private lateinit var modeBreakdownContainer: android.widget.LinearLayout
     private lateinit var tvEmpty       : TextView
     private lateinit var progressBar   : ProgressBar
     private lateinit var recyclerReport: RecyclerView
     private lateinit var btnMonthly    : Button
+    private lateinit var btnToday      : Button
+    private lateinit var btnYesterday  : Button
     private lateinit var btnStartDate  : Button
     private lateinit var btnEndDate    : Button
     private lateinit var btnExcel      : Button
@@ -60,6 +67,9 @@ class ReportActivity : BaseActivity() {
     private var mode         = "day"               // "day" | "month"
     private var reportMonth  = Calendar.getInstance().get(Calendar.MONTH) + 1
     private var reportYear   = Calendar.getInstance().get(Calendar.YEAR)
+    private var isAdmin = true
+    private var outstandingBalance = 0.0
+    private var businessSettings = BusinessSettings()
 
     // Full loaded list — used by both RecyclerView and exports
     private val paymentList = mutableListOf<PaymentModel>()
@@ -96,6 +106,7 @@ class ReportActivity : BaseActivity() {
     private fun restrictNonAdminToCurrentMonth() {
         val role = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE)
             .getString("user_role", Roles.ADMIN) ?: Roles.ADMIN
+        isAdmin = role == Roles.ADMIN
         if (role == Roles.ADMIN) return
 
         findViewById<View>(R.id.rowMonthlyFilter).visibility = View.GONE
@@ -111,11 +122,16 @@ class ReportActivity : BaseActivity() {
         tvReportTitle  = findViewById(R.id.tvReportTitle)
         tvTotal        = findViewById(R.id.tvTotal)
         tvCount        = findViewById(R.id.tvCount)
+        tvOutstanding  = findViewById(R.id.tvOutstanding)
+        tvCollectorReportTitle = findViewById(R.id.tvCollectorReportTitle)
+        collectorReportContainer = findViewById(R.id.collectorReportContainer)
         modeBreakdownContainer = findViewById(R.id.modeBreakdownContainer)
         tvEmpty        = findViewById(R.id.tvEmpty)
         progressBar    = findViewById(R.id.progressBarReport)
         recyclerReport = findViewById(R.id.recyclerReport)
         btnMonthly     = findViewById(R.id.btnMonthly)
+        btnToday       = findViewById(R.id.btnToday)
+        btnYesterday   = findViewById(R.id.btnYesterday)
         btnStartDate   = findViewById(R.id.btnStartDate)
         btnEndDate     = findViewById(R.id.btnEndDate)
         btnExcel       = findViewById(R.id.btnExcel)
@@ -135,6 +151,8 @@ class ReportActivity : BaseActivity() {
     // ── Buttons ───────────────────────────────────────────────────────────────
     private fun setupButtons() {
         btnMonthly.setOnClickListener   { showMonthYearPicker() }
+        btnToday.setOnClickListener     { selectQuickDate(0) }
+        btnYesterday.setOnClickListener { selectQuickDate(-1) }
         btnStartDate.setOnClickListener { mode = "day"; showDatePicker(isStart = true) }
         btnEndDate.setOnClickListener   { mode = "day"; showDatePicker(isStart = false) }
 
@@ -144,6 +162,16 @@ class ReportActivity : BaseActivity() {
         btnPdf.setOnClickListener {
             if (paymentList.isEmpty()) toast(getString(R.string.no_data_export)) else exportPDF()
         }
+    }
+
+    private fun selectQuickDate(dayOffset: Int) {
+        val selected = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, dayOffset) }
+        val date = sdf.format(selected.time)
+        startDateStr = date
+        endDateStr = date
+        mode = "day"
+        updateButtonLabels()
+        loadReport()
     }
 
     // ── Date pickers ──────────────────────────────────────────────────────────
@@ -205,13 +233,24 @@ class ReportActivity : BaseActivity() {
                     "month" -> repository.fetchPaymentsByMonth(reportMonth, reportYear)
                     else    -> repository.fetchPaymentsByDateRange(startDateStr, endDateStr)
                 }
+                val prefs = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE)
+                val role = prefs.getString("user_role", Roles.EMPLOYEE) ?: Roles.EMPLOYEE
+                val username = prefs.getString("username", "") ?: ""
+                val visiblePayments = if (role == Roles.ADMIN) {
+                    payments
+                } else {
+                    payments.filter { it.collectorUsername.equals(username, ignoreCase = true) }
+                }
+                outstandingBalance = if (role == Roles.ADMIN) repository.fetchTotalOutstanding() else 0.0
+                businessSettings = runCatching { BusinessSettingsRepository().load() }
+                    .getOrDefault(BusinessSettings())
 
                 // Compute summary totals
                 grandTotal = 0.0
                 modeTotals = linkedMapOf()
                 paymentList.clear()
 
-                for (p in payments) {
+                for (p in visiblePayments) {
                     grandTotal += p.paid
                     val modeKey = p.paymentMode.ifBlank { "Other" }
                     modeTotals[modeKey] = (modeTotals[modeKey] ?: 0.0) + p.paid
@@ -246,6 +285,14 @@ class ReportActivity : BaseActivity() {
             paymentCount = paymentList.size,
             modeTotals   = modeTotals
         )
+        tvOutstanding.visibility = if (isAdmin) View.VISIBLE else View.GONE
+        if (isAdmin) {
+            tvOutstanding.text = getString(
+                R.string.outstanding_total_format,
+                inrFormat.format(outstandingBalance.toLong())
+            )
+        }
+        renderCollectorBreakdown()
 
         tvEmpty.visibility        = if (paymentList.isEmpty()) View.VISIBLE else View.GONE
         recyclerReport.visibility = if (paymentList.isEmpty()) View.GONE   else View.VISIBLE
@@ -253,6 +300,30 @@ class ReportActivity : BaseActivity() {
         // Reuse the already-attached adapter — swap the data in place
         // instead of creating a new adapter on every reload.
         reportAdapter.updateList(paymentList.toList())
+    }
+
+    private fun renderCollectorBreakdown() {
+        collectorReportContainer.removeAllViews()
+        tvCollectorReportTitle.visibility = if (isAdmin) View.VISIBLE else View.GONE
+        if (!isAdmin) return
+
+        val collectors = paymentList.groupBy { it.collectorUsername.ifBlank { "Unknown" } }
+        for ((username, payments) in collectors.toSortedMap()) {
+            val cash = payments.filter { it.paymentMode.equals("Cash", true) }.sumOf { it.paid }
+            val digital = payments.filterNot { it.paymentMode.equals("Cash", true) }.sumOf { it.paid }
+            collectorReportContainer.addView(TextView(this).apply {
+                text = getString(
+                    R.string.collector_summary_format,
+                    username,
+                    payments.size,
+                    inrFormat.format(cash.toLong()),
+                    inrFormat.format(digital.toLong()),
+                    inrFormat.format((cash + digital).toLong())
+                )
+                textSize = 13f
+                setPadding(0, dpToPx(6), 0, dpToPx(6))
+            })
+        }
     }
 
     /**
@@ -281,7 +352,7 @@ class ReportActivity : BaseActivity() {
             val row = TextView(this).apply {
                 text = getString(R.string.mode_amount_format, modeName, inrFormat.format(amount.toLong()))
                 textSize = 14f
-                setTextColor(android.graphics.Color.parseColor("#1976D2"))
+                setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.cm_blue))
                 setPadding(0, 0, 0, dpToPx(4))
             }
             modeBreakdownContainer.addView(row)
@@ -290,6 +361,8 @@ class ReportActivity : BaseActivity() {
 
     private fun dpToPx(dp: Int): Int =
         (dp * resources.displayMetrics.density).toInt()
+
+    private fun csvCell(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 
     private fun setLoading(on: Boolean) {
         progressBar.visibility    = if (on) View.VISIBLE else View.GONE
@@ -308,25 +381,48 @@ class ReportActivity : BaseActivity() {
 
             file.printWriter().use { w ->
                 // ── Header block ──────────────────────────────────────────────
-                w.println("Vinayaka Cable Network")
+                if (businessSettings.name.isNotBlank()) w.println(csvCell(businessSettings.name))
+                listOf(businessSettings.phone, businessSettings.address)
+                    .filter { it.isNotBlank() }
+                    .takeIf { it.isNotEmpty() }
+                    ?.joinToString(" · ")
+                    ?.let(w::println)
                 w.println("${tvReportTitle.text}")
                 w.println("Total Collected: ₹${grandTotal.toLong()}")
                 w.println(modeTotals.entries.joinToString(",") { (name, amount) -> "$name: ₹${amount.toLong()}" })
                 w.println("Payments: ${paymentList.size}")
                 w.println()
 
-                // ── Column headers ────────────────────────────────────────────
-                w.println("Name,Series Number,Paid Amount,Status,Payment Mode,Payment Number")
+                val headers = listOf(
+                    "Name", "Serial Number (VC No)", "Pending Amount", "LCO Share", "MSO Share",
+                    "Package", "Receipt Number", "Date", "Month", "Mode", "PhonePe Number",
+                    "Amount Paid", "Bill Amount", "Extra Charges", "Remarks"
+                )
+                w.println(headers.joinToString(",") { csvCell(it) })
 
-                // ── Data rows ─────────────────────────────────────────────────
-                for (p in paymentList) {
-                    val name = if (p.name.contains(",")) "\"${p.name}\"" else p.name
-                    w.println("$name,${p.customerId},${p.paid.toLong()},Paid,${p.paymentMode},${p.paymentNumber}")
+                for (payment in paymentList) {
+                    val lcoShare = String.format(Locale.US, "%.2f", payment.paid * 0.47)
+                    val msoShare = String.format(Locale.US, "%.2f", payment.paid - payment.paid * 0.47)
+                    val billAmount = if (payment.billAmount > 0.0) payment.billAmount else payment.baseAmount
+                    val values = listOf(
+                        payment.name,
+                        payment.vcNumber.ifBlank { payment.customerId },
+                        payment.remaining.toString(),
+                        lcoShare,
+                        msoShare,
+                        payment.packageName,
+                        payment.receiptNumber,
+                        payment.date,
+                        payment.date.take(7),
+                        payment.paymentMode,
+                        if (payment.paymentMode.equals("PhonePe", true)) payment.paymentNumber else "",
+                        payment.paid.toString(),
+                        billAmount.toString(),
+                        payment.extraCharges.toString(),
+                        payment.remarks
+                    )
+                    w.println(values.joinToString(",") { csvCell(it) })
                 }
-
-                // ── Grand total row ───────────────────────────────────────────
-                w.println()
-                w.println(",GRAND TOTAL,${grandTotal.toLong()},,,")
             }
 
             shareFile(file, "text/csv")
@@ -363,7 +459,7 @@ class ReportActivity : BaseActivity() {
     private val XE get() = X0 + TW                // right edge
 
     // ── Row metrics ───────────────────────────────────────────────────────────
-    private val ROW_H   = 32f
+    private val ROW_H   = 76f
     private val HEAD_H  = 26f
     private val TITLE_H = 66f                     // space for 3-line header block
 
@@ -397,8 +493,10 @@ class ReportActivity : BaseActivity() {
         // ── Title block (Page 1 only) ─────────────────────────────────────────
         fun drawTitleBlock() {
             pText.isFakeBoldText = true; pText.textSize = 14f; pText.color = DARK
-            val line1 = "Vinayaka Cable Network — Collection Report"
-            cv.drawText(line1, (PW - pText.measureText(line1)) / 2f, MG + 16f, pText)
+            val line1 = businessSettings.name
+            if (line1.isNotBlank()) {
+                cv.drawText(line1, (PW - pText.measureText(line1)) / 2f, MG + 16f, pText)
+            }
 
             pText.isFakeBoldText = false; pText.textSize = 9f; pText.color = Color.parseColor("#616161")
             val line2 = "Report Date: ${tvReportTitle.text}"
@@ -422,9 +520,9 @@ class ReportActivity : BaseActivity() {
             hc("Name",           X0, C_NAME)
             hc("Series No.",     X1, C_SERIES)
             hc("Paid ₹",         X2, C_PAID)
-            hc("Status",         X3, C_STATUS)
+            hc("Balance ₹",      X3, C_STATUS)
             hc("Mode",           X4, C_MODE)
-            hc("Payment Number", X5, C_NUM)
+            hc("Receipt No.",    X5, C_NUM)
         }
 
         // ── Data row ──────────────────────────────────────────────────────────
@@ -433,7 +531,7 @@ class ReportActivity : BaseActivity() {
             pLine.color = DIVIDER
             cv.drawLine(X0, yTop + ROW_H, XE, yTop + ROW_H, pLine)
             pText.color = DARK; pText.isFakeBoldText = false; pText.textSize = 8.5f
-            val bl = yTop + ROW_H / 2f - (pText.ascent() + pText.descent()) / 2f
+            val bl = yTop + 16f - (pText.ascent() + pText.descent()) / 2f
             val pad = 3f
 
             // Name — shrink font to fit
@@ -450,9 +548,42 @@ class ReportActivity : BaseActivity() {
             }
             cc(p.customerId,                   X1, C_SERIES)
             cc("₹${p.paid.toLong()}",          X2, C_PAID)
-            cc("Paid",                         X3, C_STATUS)
+            cc("₹${p.remaining.toLong()}",    X3, C_STATUS)
             cc(p.paymentMode,                  X4, C_MODE)
-            cc(p.paymentNumber.ifEmpty { "—" }, X5, C_NUM)
+            cc(p.receiptNumber.ifEmpty { "—" }, X5, C_NUM)
+
+            val billAmount = if (p.billAmount > 0.0) p.billAmount else p.baseAmount
+            val lcoShare = p.paid * 0.47
+            val detail = listOf(
+                "Pending ₹${p.remaining}",
+                "LCO ₹${String.format(Locale.US, "%.2f", lcoShare)}",
+                "MSO ₹${String.format(Locale.US, "%.2f", p.paid - lcoShare)}",
+                "Package ${p.packageName.ifBlank { "—" }}",
+                "Date ${p.date}",
+                "Month ${p.date.take(7)}",
+                "PhonePe ${if (p.paymentMode.equals("PhonePe", true)) p.paymentNumber else "—"}",
+                "Bill ₹$billAmount",
+                "Extra ₹${p.extraCharges}",
+                "Remarks ${p.remarks.ifBlank { "—" }}"
+            ).joinToString("  |  ")
+            pText.color = DARK
+            pText.textSize = 6.5f
+            val maxWidth = TW - pad * 2
+            var line = ""
+            var lineNumber = 0
+            for (word in detail.split(Regex("\\s+"))) {
+                val next = if (line.isEmpty()) word else "$line $word"
+                if (pText.measureText(next) > maxWidth && line.isNotEmpty()) {
+                    cv.drawText(line, X0 + pad, yTop + 34f + lineNumber * 10f, pText)
+                    lineNumber++
+                    line = word
+                } else {
+                    line = next
+                }
+            }
+            if (line.isNotEmpty() && lineNumber < 4) {
+                cv.drawText(line, X0 + pad, yTop + 34f + lineNumber * 10f, pText)
+            }
         }
 
         // ── Grand total footer ────────────────────────────────────────────────
@@ -513,13 +644,13 @@ class ReportActivity : BaseActivity() {
     // ── Share helper ──────────────────────────────────────────────────────────
     private fun shareFile(file: File, mimeType: String) {
         val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-        startActivity(Intent.createChooser(
-            Intent(Intent.ACTION_SEND).apply {
-                type = mimeType
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }, "Share via"
-        ))
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newUri(contentResolver, file.name, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(sendIntent, "Share via"))
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()

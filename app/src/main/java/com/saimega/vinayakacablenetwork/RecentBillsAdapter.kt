@@ -1,10 +1,10 @@
 package com.saimega.vinayakacablenetwork
 
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 
 class RecentBillsAdapter(
@@ -39,10 +39,11 @@ class RecentBillsAdapter(
         holder.tvCustomerName.text = name
         holder.tvAvatarInitial.text = name.firstOrNull()?.uppercase() ?: "?"
 
-        // Randomize avatar background color slightly based on name to make it look nice
-        val colors = arrayOf("#6366F1", "#A855F7", "#E11D48", "#10B981", "#F59E0B")
+        val colors = intArrayOf(R.color.cm_blue, R.color.cm_teal, R.color.cm_amber, R.color.cm_coral)
         val colorHash = kotlin.math.abs(name.hashCode()) % colors.size
-        holder.vAvatarBg.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor(colors[colorHash]))
+        holder.vAvatarBg.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            ContextCompat.getColor(holder.vAvatarBg.context, colors[colorHash])
+        )
 
         val amountStr = if (p.paid == p.paid.toLong().toDouble()) p.paid.toLong().toString() else String.format("%.2f", p.paid)
         holder.tvAmount.text = "+₹$amountStr"

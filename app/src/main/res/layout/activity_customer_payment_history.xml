@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F7FA">
+    android:background="@color/cm_bg">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -15,7 +15,7 @@
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="?attr/colorPrimary">
+            android:background="@color/cm_sidebar">
 
             <ImageButton
                 android:id="@+id/btnFilter"
@@ -57,9 +57,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="1dp"
+                app:cardBackgroundColor="@color/cm_card"
                 android:visibility="gone"
                 tools:visibility="visible">
 
@@ -97,7 +97,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/total_paid"
                                 android:textSize="11sp"
-                                android:textColor="#757575" />
+                                android:textColor="@color/cm_text_secondary" />
                             <TextView
                                 android:id="@+id/tvTotalPaid"
                                 android:layout_width="wrap_content"
@@ -105,7 +105,7 @@
                                 android:text="@string/rupee_placeholder"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
-                                android:textColor="#2E7D32"
+                                android:textColor="@color/cm_teal"
                                 android:layout_marginTop="4dp" />
                         </LinearLayout>
 
@@ -121,7 +121,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/payments_count_label"
                                 android:textSize="11sp"
-                                android:textColor="#757575" />
+                                android:textColor="@color/cm_text_secondary" />
                             <TextView
                                 android:id="@+id/tvTotalCount"
                                 android:layout_width="wrap_content"
@@ -129,7 +129,7 @@
                                 android:text="0"
                                 android:textSize="16sp"
                                 android:textStyle="bold"
-                                android:textColor="#212121"
+                                android:textColor="@color/cm_text_primary"
                                 android:layout_marginTop="4dp" />
                         </LinearLayout>
 
@@ -145,7 +145,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="@string/last_payment"
                                 android:textSize="11sp"
-                                android:textColor="#757575" />
+                                android:textColor="@color/cm_text_secondary" />
                             <TextView
                                 android:id="@+id/tvLastDate"
                                 android:layout_width="wrap_content"
@@ -153,7 +153,7 @@
                                 android:text="@string/dash"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
-                                android:textColor="#212121"
+                                android:textColor="@color/cm_text_primary"
                                 android:layout_marginTop="4dp"
                                 android:maxLines="1" />
                         </LinearLayout>
@@ -195,14 +195,14 @@
                     android:layout_width="80dp"
                     android:layout_height="80dp"
                     android:src="@android:drawable/ic_menu_info_details"
-                    app:tint="#BDBDBD" />
+                    app:tint="@color/cm_text_tertiary" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/no_payment_records"
                     android:textSize="16sp"
-                    android:textColor="#9E9E9E"
+                    android:textColor="@color/cm_text_secondary"
                     android:layout_marginTop="16dp" />
             </LinearLayout>
 

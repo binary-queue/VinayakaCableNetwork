@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.method.HideReturnsTransformationMethod
 import android.text.method.PasswordTransformationMethod
+import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageButton
@@ -27,6 +28,9 @@ class LoginActivity : BaseActivity() {
     private lateinit var tvForgotPassword : TextView
     private lateinit var tvContactSupport : TextView
     private lateinit var btnLogin         : AppCompatButton
+    private lateinit var roleAdminOption : View
+    private lateinit var roleCollectorOption : View
+    private var selectedLoginRole = Roles.ADMIN
 
     // ── Prefs key ──────────────────────────────────────────────────────────
     private val PREFS_NAME     = "vinayaka_prefs"
@@ -43,10 +47,6 @@ class LoginActivity : BaseActivity() {
         bindViews()
         restoreRememberedCredentials()
         setListeners()
-
-        lifecycleScope.launch {
-            AuthRepository().ensureSeeded()
-        }
     }
 
     // ── Bind all view references ───────────────────────────────────────────
@@ -58,11 +58,19 @@ class LoginActivity : BaseActivity() {
         tvForgotPassword  = findViewById(R.id.tvForgotPassword)
         tvContactSupport  = findViewById(R.id.tvContactSupport)
         btnLogin          = findViewById(R.id.btnLogin)
+        roleAdminOption = findViewById(R.id.roleAdminOption)
+        roleCollectorOption = findViewById(R.id.roleCollectorOption)
     }
 
     // ── Pre-fill saved username if "Remember me" was checked before ────────
     private fun restoreRememberedCredentials() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        selectedLoginRole = if (prefs.getString(KEY_ROLE, Roles.ADMIN).equals(Roles.ADMIN, ignoreCase = true)) {
+            Roles.ADMIN
+        } else {
+            Roles.EMPLOYEE
+        }
+        updateSelectedLoginRole()
         if (prefs.getBoolean(KEY_REMEMBER, false)) {
             val saved = prefs.getString(KEY_REMEMBERED, "") ?: ""
             if (saved.isNotEmpty()) {
@@ -74,6 +82,9 @@ class LoginActivity : BaseActivity() {
 
     // ── Wire all click / action listeners ─────────────────────────────────
     private fun setListeners() {
+
+        roleAdminOption.setOnClickListener { selectLoginRole(Roles.ADMIN) }
+        roleCollectorOption.setOnClickListener { selectLoginRole(Roles.EMPLOYEE) }
 
         // ── Password visibility toggle ─────────────────────────────────────
         btnTogglePassword.setOnClickListener {
@@ -144,6 +155,22 @@ class LoginActivity : BaseActivity() {
         lifecycleScope.launch {
             when (val result = AuthRepository().login(username, password)) {
                 is LoginResult.Success -> {
+                    val accountIsAdmin = result.role.equals(Roles.ADMIN, ignoreCase = true)
+                    if (accountIsAdmin != (selectedLoginRole == Roles.ADMIN)) {
+                        btnLogin.isEnabled = true
+                        val selectedRoleLabel = if (selectedLoginRole == Roles.ADMIN) {
+                            getString(R.string.login_role_admin)
+                        } else {
+                            getString(R.string.login_role_collector)
+                        }
+                        Toast.makeText(
+                            this@LoginActivity,
+                            getString(R.string.login_role_mismatch, selectedRoleLabel),
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@launch
+                    }
+
                     val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
                     prefs.putString(KEY_USERNAME, result.username)
                     prefs.putString(KEY_ROLE, result.role)
@@ -174,5 +201,21 @@ class LoginActivity : BaseActivity() {
                 }
             }
         }
+    }
+
+    private fun selectLoginRole(role: String) {
+        selectedLoginRole = role
+        updateSelectedLoginRole()
+    }
+
+    private fun updateSelectedLoginRole() {
+        roleAdminOption.setBackgroundResource(
+            if (selectedLoginRole == Roles.ADMIN) R.drawable.bg_login_role_selected
+            else R.drawable.bg_login_role_unselected
+        )
+        roleCollectorOption.setBackgroundResource(
+            if (selectedLoginRole == Roles.ADMIN) R.drawable.bg_login_role_unselected
+            else R.drawable.bg_login_role_selected
+        )
     }
 }

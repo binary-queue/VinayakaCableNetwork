@@ -1,10 +1,10 @@
 package com.saimega.vinayakacablenetwork
 
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 
@@ -56,12 +56,16 @@ class PaymentHistoryAdapter(
         // Status
         if (p.remaining <= 0) {
             holder.tvStatus.text = holder.tvStatus.context.getString(R.string.paid_fully_label)
-            holder.tvStatus.setTextColor(Color.parseColor("#2E7D32"))
-            holder.tvStatus.setBackgroundColor(Color.parseColor("#E8F5E9"))
+            holder.tvStatus.setTextColor(ContextCompat.getColor(holder.tvStatus.context, R.color.cm_teal))
+            holder.tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(holder.tvStatus.context, R.color.cm_teal_soft)
+            )
         } else {
             holder.tvStatus.text = holder.tvStatus.context.getString(R.string.partial_due_format, p.remaining.toString())
-            holder.tvStatus.setTextColor(Color.parseColor("#C62828"))
-            holder.tvStatus.setBackgroundColor(Color.parseColor("#FFEBEE"))
+            holder.tvStatus.setTextColor(ContextCompat.getColor(holder.tvStatus.context, R.color.cm_coral))
+            holder.tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(holder.tvStatus.context, R.color.cm_coral_soft)
+            )
         }
 
         holder.btnEdit.visibility = if (canEdit) View.VISIBLE else View.GONE

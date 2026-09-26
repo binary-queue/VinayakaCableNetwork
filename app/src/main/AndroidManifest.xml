@@ -19,6 +19,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
     <application
+        android:name=".VinayakaCableApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -61,6 +62,18 @@
         <!-- CUSTOMER PAYMENT HISTORY -->
         <activity
             android:name=".CustomerPaymentHistoryActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".CashHandoverActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MonthlyLedgerActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".TodayCollectionActivity"
             android:exported="false" />
 
         <!-- LOGIN (LAUNCHER) -->

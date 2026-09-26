@@ -11,7 +11,9 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="@color/cm_sidebar"
+        app:elevation="0dp">
+
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -32,7 +34,7 @@
                 android:layout_gravity="end"
                 android:layout_marginEnd="16dp"
                 android:background="@drawable/bg_avatar_circle"
-                android:backgroundTint="#2962FF"
+                android:backgroundTint="@color/cm_blue"
                 android:text="VN"
                 android:textColor="@android:color/white"
                 android:textSize="14sp"
@@ -52,9 +54,9 @@
             android:id="@+id/cardSearch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="24dp"
+            android:layout_marginHorizontal="14dp"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="24dp"
+            app:cardCornerRadius="14dp"
             app:cardElevation="0dp"
             app:strokeWidth="1dp"
             app:strokeColor="?attr/colorSurfaceVariant"
@@ -67,7 +69,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="16dp">
+
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -84,6 +87,39 @@
                     android:textSize="13sp"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginTop="4dp"/>
+
+                <LinearLayout
+                    android:id="@+id/rowMonthFilter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <ImageButton
+                        android:id="@+id/btnPreviousMonth"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/month_previous"
+                        android:src="@android:drawable/ic_media_previous"
+                        app:tint="?attr/colorPrimary" />
+                    <TextView
+                        android:id="@+id/tvSelectedMonth"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                    <ImageButton
+                        android:id="@+id/btnNextMonth"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/month_next"
+                        android:src="@android:drawable/ic_media_next"
+                        app:tint="?attr/colorPrimary" />
+                </LinearLayout>
 
                 <!-- Search Pill Input -->
                 <LinearLayout
@@ -124,7 +160,7 @@
                         android:text="@string/search"
                         android:textAllCaps="false"
                         app:cornerRadius="22dp"
-                        android:backgroundTint="#2962FF"
+                        android:backgroundTint="@color/cm_blue"
                         android:textColor="@android:color/white"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"/>
@@ -163,6 +199,27 @@
                             android:text="@string/unpaid_label"
                             app:chipIcon="@drawable/ic_unpaid_red"
                             app:chipIconVisible="true"/>
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipPartial"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/partial_label" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipActive"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/active_label" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipInactive"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/cut_inactive" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/chipPaid"
@@ -257,7 +314,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:src="@drawable/ic_lightbulb"
-                    app:tint="#2962FF"/>
+                    app:tint="@color/cm_blue"/>
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -267,7 +324,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/tip_label"
-                        android:textColor="#2962FF"
+                        android:textColor="@color/cm_blue"
                         android:textStyle="bold"
                         android:textSize="14sp"/>
                     <TextView
@@ -306,7 +363,7 @@
         android:textColor="@android:color/white"
         android:textSize="16sp"
         android:textStyle="bold"
-        app:backgroundTint="#2E7D32"
+        app:backgroundTint="@color/cm_teal"
         app:cornerRadius="12dp"
         app:icon="@drawable/ic_download_pdf"
         app:iconGravity="textStart"

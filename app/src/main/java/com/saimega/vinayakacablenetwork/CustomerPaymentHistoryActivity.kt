@@ -291,6 +291,7 @@ class CustomerPaymentHistoryActivity : BaseActivity() {
                             paymentId = doc.id,
                             customerId = doc.getString("customerId") ?: "",
                             name = doc.getString("name") ?: "",
+                            teluguName = doc.getString("teluguName") ?: "",
                             baseAmount = (doc.get("baseAmount") as? Number)?.toDouble() ?: 0.0,
                             extraCharges = (doc.get("extraCharges") as? Number)?.toDouble() ?: 0.0,
                             total = (doc.get("total") as? Number)?.toDouble() ?: 0.0,
@@ -298,6 +299,8 @@ class CustomerPaymentHistoryActivity : BaseActivity() {
                             remaining = (doc.get("remaining") as? Number)?.toDouble() ?: 0.0,
                             paymentMode = doc.getString("paymentMode") ?: "",
                             paymentNumber = doc.getString("paymentNumber") ?: "",
+                            receiptNumber = doc.getString("receiptNumber") ?: "",
+                            collectorUsername = doc.getString("collectorUsername") ?: "",
                             date = doc.getString("date") ?: "",
                             timestamp = (doc.get("timestamp") as? Number)?.toLong() ?: 0L
                         )

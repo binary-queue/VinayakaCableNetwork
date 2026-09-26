@@ -8,14 +8,16 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="@color/cm_sidebar"
         app:elevation="0dp">
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:title="@string/import_customers_title"
-            app:navigationIcon="?attr/homeAsUpIndicator" />
+            app:titleTextColor="@color/cm_on_gradient"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:navigationIconTint="@color/cm_on_gradient" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -35,7 +37,7 @@
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:src="@android:drawable/ic_menu_save"
-            app:tint="#4F46E5"
+            app:tint="@color/cm_blue"
             android:alpha="0.8" />
 
         <TextView
@@ -63,7 +65,7 @@
             android:text="@string/paste_data_label"
             app:cornerRadius="16dp"
             app:icon="@android:drawable/ic_menu_edit"
-            app:backgroundTint="#4F46E5"
+            app:backgroundTint="@color/cm_blue"
             android:layout_marginBottom="16dp" />
 
         <com.google.android.material.button.MaterialButton

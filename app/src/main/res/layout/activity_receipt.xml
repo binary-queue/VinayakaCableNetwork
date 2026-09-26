@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F0F4F8">
+    android:background="@color/cm_bg">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
@@ -22,7 +22,7 @@
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium"
             android:textColor="#FFFFFF"
-            android:background="?attr/colorPrimary"
+            android:background="@color/cm_sidebar"
             android:gravity="center"
             android:letterSpacing="0.02" />
 
@@ -81,6 +81,15 @@
                             android:gravity="center" />
 
                         <TextView
+                            android:id="@+id/tvReceiptBusinessContact"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textColor="#CCffffff"
+                            android:textSize="11sp"
+                            android:gravity="center" />
+
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
@@ -108,6 +117,7 @@
                             android:layout_marginBottom="16dp">
 
                             <TextView
+                                android:id="@+id/tvReceiptBillLabel"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
@@ -128,6 +138,168 @@
                                 android:textColor="#212121"
                                 android:gravity="end"
                                 android:maxLines="2" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="16dp">
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/previous_outstanding_label"
+                                android:textSize="13sp"
+                                android:textColor="#757575" />
+                            <TextView
+                                android:id="@+id/tvReceiptPreviousOutstanding"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:gravity="end"
+                                android:text="@string/rupee_placeholder"
+                                android:textColor="#212121"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="16dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/remaining_label"
+                                android:textSize="13sp"
+                                android:textColor="#757575" />
+
+                            <TextView
+                                android:id="@+id/tvReceiptBalance"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:gravity="end"
+                                android:text="@string/rupee_placeholder"
+                                android:textColor="#212121"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="16dp">
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/already_paid_label"
+                                android:textSize="13sp"
+                                android:textColor="#757575" />
+                            <TextView
+                                android:id="@+id/tvReceiptAlreadyPaid"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:gravity="end"
+                                android:text="@string/rupee_placeholder"
+                                android:textColor="#212121"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="16dp">
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/total_payable_label"
+                                android:textSize="13sp"
+                                android:textColor="#757575" />
+                            <TextView
+                                android:id="@+id/tvReceiptTotalPayable"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:gravity="end"
+                                android:text="@string/rupee_placeholder"
+                                android:textColor="#212121"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="16dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/collector_label"
+                                android:textSize="13sp"
+                                android:textColor="#757575" />
+
+                            <TextView
+                                android:id="@+id/tvReceiptCollector"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:gravity="end"
+                                android:text="@string/dash"
+                                android:textColor="#212121"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="16dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/receipt_number_label"
+                                android:textSize="13sp"
+                                android:textColor="#757575"
+                                android:fontFamily="sans-serif" />
+
+                            <TextView
+                                android:id="@+id/tvReceiptNumber"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:text="@string/dash"
+                                android:textSize="14sp"
+                                android:textStyle="bold"
+                                android:fontFamily="sans-serif-medium"
+                                android:textColor="#212121"
+                                android:gravity="end" />
                         </LinearLayout>
 
                         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0F0F0" android:layout_marginBottom="16dp" />
@@ -317,7 +489,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
-                        android:background="#F9FBE7"
+                        android:background="@color/cm_teal_soft"
                         android:paddingTop="16dp"
                         android:paddingBottom="16dp"
                         android:paddingStart="24dp"
@@ -330,7 +502,7 @@
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:fontFamily="sans-serif-medium"
-                            android:textColor="#33691E"
+                            android:textColor="@color/cm_teal"
                             android:gravity="center" />
 
                         <TextView
@@ -340,7 +512,7 @@
                             android:text="@string/thank_you_payment"
                             android:textSize="12sp"
                             android:fontFamily="sans-serif"
-                            android:textColor="#558B2F"
+                            android:textColor="@color/cm_teal"
                             android:gravity="center" />
 
                     </LinearLayout>
@@ -360,7 +532,7 @@
         android:paddingEnd="16dp"
         android:paddingBottom="20dp"
         android:paddingTop="12dp"
-        android:background="#F0F4F8">
+        android:background="@color/cm_bg">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnBluetoothPrint"
@@ -373,7 +545,7 @@
             android:textAllCaps="false"
             android:textSize="15sp"
             app:cornerRadius="16dp"
-            app:backgroundTint="#1976D2"
+            app:backgroundTint="@color/cm_blue"
             app:elevation="4dp"
             app:rippleColor="#33FFFFFF" />
 
@@ -394,7 +566,7 @@
             android:textAllCaps="false"
             android:textSize="15sp"
             app:cornerRadius="16dp"
-            app:backgroundTint="#37474F"
+            app:backgroundTint="@color/cm_sidebar"
             app:elevation="4dp"
             app:rippleColor="#33FFFFFF" />
 

@@ -13,6 +13,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
@@ -20,6 +21,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -36,6 +38,9 @@ class CustomerListActivity : BaseActivity() {
     private lateinit var btnDownloadPdfBar: MaterialButton
     private lateinit var progressBar: CircularProgressIndicator
     private lateinit var layoutEmptyState: LinearLayout
+    private lateinit var tvSelectedMonth: android.widget.TextView
+    private lateinit var btnPreviousMonth: android.widget.ImageButton
+    private lateinit var btnNextMonth: android.widget.ImageButton
 
     // ── ViewModel ─────────────────────────────────────────────────────────────
     private val viewModel: CustomerViewModel by viewModels()
@@ -46,6 +51,7 @@ class CustomerListActivity : BaseActivity() {
             val intent = Intent(this, CustomerDetailsActivity::class.java).apply {
                 putExtra("seriesNumber", customer.id)
                 putExtra("customerModel", customer)
+                putExtra("MONTH_KEY", monthKey())
             }
             startActivity(intent)
         }
@@ -54,6 +60,21 @@ class CustomerListActivity : BaseActivity() {
     // ── Firestore (only used by generatePDF / generateCSV) ────────────────────
     private val db = FirebaseFirestore.getInstance()
     private lateinit var type: String
+    private val selectedMonth = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    private val minimumBillingMonth = Calendar.getInstance().apply {
+        set(2026, Calendar.APRIL, 1, 0, 0, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    private val userRole by lazy {
+        getSharedPreferences("vinayaka_prefs", MODE_PRIVATE).getString("user_role", Roles.EMPLOYEE)
+            ?: Roles.EMPLOYEE
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +90,9 @@ class CustomerListActivity : BaseActivity() {
         btnDownloadPdfBar = findViewById(R.id.btnDownloadPdfBar)
         progressBar      = findViewById(R.id.progressBar)
         layoutEmptyState = findViewById(R.id.layoutEmptyState)
+        tvSelectedMonth = findViewById(R.id.tvSelectedMonth)
+        btnPreviousMonth = findViewById(R.id.btnPreviousMonth)
+        btnNextMonth = findViewById(R.id.btnNextMonth)
 
         // Toolbar back navigation
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
@@ -80,7 +104,18 @@ class CustomerListActivity : BaseActivity() {
             ?: intent.getStringExtra("type")
             ?: "ALL"
         type = filterExtra.lowercase()
-        if (type !in listOf("paid", "unpaid", "partial", "all")) type = "all"
+        if (type !in listOf("paid", "unpaid", "partial", "active", "inactive", "all")) type = "all"
+        if (userRole == Roles.ADMIN) {
+            intent.getStringExtra("MONTH_KEY")?.let { requestedMonth ->
+                runCatching {
+                    val parsed = SimpleDateFormat("yyyy-MM", Locale.US).parse(requestedMonth)
+                    if (parsed != null) selectedMonth.time = parsed
+                }
+            }
+        }
+        if (selectedMonth.before(minimumBillingMonth)) {
+            selectedMonth.timeInMillis = minimumBillingMonth.timeInMillis
+        }
 
         btnDownload.text = getString(R.string.download_type_pdf, type.replaceFirstChar { it.uppercase() })
         btnDownloadCsv.visibility = View.GONE
@@ -89,6 +124,9 @@ class CustomerListActivity : BaseActivity() {
         val chipAll    = findViewById<com.google.android.material.chip.Chip>(R.id.chipAll)
         val chipUnpaid = findViewById<com.google.android.material.chip.Chip>(R.id.chipUnpaid)
         val chipPaid   = findViewById<com.google.android.material.chip.Chip>(R.id.chipPaid)
+        val chipPartial = findViewById<com.google.android.material.chip.Chip>(R.id.chipPartial)
+        val chipActive = findViewById<com.google.android.material.chip.Chip>(R.id.chipActive)
+        val chipInactive = findViewById<com.google.android.material.chip.Chip>(R.id.chipInactive)
 
         // ── Contextual chip visibility ───────────────────────────────────────
         // Arriving with a specific status (from a dashboard stat card) shows a
@@ -96,32 +134,45 @@ class CustomerListActivity : BaseActivity() {
         // chip repeating that back added nothing, so the whole picker is hidden.
         // Only "all" gives the user a real choice between statuses, so only
         // there do the chips appear.
+        chipGroupStatus.visibility = View.VISIBLE
+        chipAll.visibility = View.VISIBLE
+        chipUnpaid.visibility = View.VISIBLE
+        chipPaid.visibility = View.VISIBLE
+        chipPartial.visibility = View.VISIBLE
+        chipActive.visibility = View.VISIBLE
+        chipInactive.visibility = View.VISIBLE
+        btnDownloadPdfBar.visibility = if (type == "all") View.GONE else View.VISIBLE
         when (type) {
-            "paid", "unpaid", "partial" -> {
-                chipGroupStatus.visibility = View.GONE
-                btnDownloadPdfBar.visibility = View.VISIBLE
-            }
-            else -> {
-                chipAll.isChecked       = true
-                chipGroupStatus.visibility = View.VISIBLE
-                chipAll.visibility      = View.VISIBLE
-                chipUnpaid.visibility   = View.VISIBLE
-                chipPaid.visibility     = View.VISIBLE
-                btnDownloadPdfBar.visibility = View.GONE
-            }
+            "paid" -> chipPaid.isChecked = true
+            "unpaid" -> chipUnpaid.isChecked = true
+            "partial" -> chipPartial.isChecked = true
+            "active" -> chipActive.isChecked = true
+            "inactive" -> chipInactive.isChecked = true
+            else -> chipAll.isChecked = true
         }
         adapter.setStatusFilter(type)
+
+        updateMonthLabel()
+        btnPreviousMonth.setOnClickListener { changeMonth(-1) }
+        btnNextMonth.setOnClickListener { changeMonth(1) }
+        btnPreviousMonth.visibility = if (userRole == Roles.ADMIN) View.VISIBLE else View.INVISIBLE
+        btnNextMonth.visibility = if (userRole == Roles.ADMIN) View.VISIBLE else View.INVISIBLE
+        loadMonthStatuses()
 
         chipGroupStatus.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
             val newType = when (checkedIds.first()) {
                 R.id.chipPaid   -> "paid"
                 R.id.chipUnpaid -> "unpaid"
+                R.id.chipPartial -> "partial"
+                R.id.chipActive -> "active"
+                R.id.chipInactive -> "inactive"
                 else            -> "all"
             }
             if (type != newType) {
                 type = newType
                 btnDownload.text = getString(R.string.download_type_pdf, type.replaceFirstChar { it.uppercase() })
+                btnDownloadPdfBar.visibility = if (type == "all") View.GONE else View.VISIBLE
                 updateResultVisibility(adapter.setStatusFilter(type))
             }
         }
@@ -148,6 +199,35 @@ class CustomerListActivity : BaseActivity() {
 
         // Kick off the first data load + attach real-time listener
         viewModel.init()
+    }
+
+    private fun monthKey(): String = SimpleDateFormat("yyyy-MM", Locale.US).format(selectedMonth.time)
+
+    private fun updateMonthLabel() {
+        tvSelectedMonth.text = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(selectedMonth.time)
+        btnNextMonth.isEnabled = monthKey() < SimpleDateFormat("yyyy-MM", Locale.US).format(Calendar.getInstance().time)
+    }
+
+    private fun changeMonth(offset: Int) {
+        if (userRole != Roles.ADMIN) return
+        val candidate = (selectedMonth.clone() as Calendar).apply { add(Calendar.MONTH, offset) }
+        if (candidate.before(minimumBillingMonth)) return
+        if (candidate.after(Calendar.getInstance())) return
+        selectedMonth.timeInMillis = candidate.timeInMillis
+        updateMonthLabel()
+        loadMonthStatuses()
+    }
+
+    private fun loadMonthStatuses() {
+        lifecycleScope.launch {
+            try {
+                val statuses = CustomerRepository().fetchCustomerMonthStatuses(monthKey())
+                val count = adapter.setMonthFilter(monthKey(), statuses)
+                updateResultVisibility(count)
+            } catch (e: Exception) {
+                Toast.makeText(this@CustomerListActivity, getString(R.string.error_prefix, e.message), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onResume() {

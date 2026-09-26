@@ -34,45 +34,6 @@ class AuthRepository {
 
     private val db = FirebaseFirestore.getInstance()
 
-    /**
-     * Seeds the three pre-existing hardcoded accounts into Firestore the
-     * first time this app ever runs against a project with an empty
-     * `users` collection. A no-op on every subsequent call. Passwords
-     * match what they always were ("1234") so nothing breaks for
-     * existing staff — they should change it via Settings afterward.
-     */
-    suspend fun ensureSeeded() {
-        val snapshot = try {
-            db.collection("users").limit(1).get(Source.SERVER).await()
-        } catch (e: Exception) {
-            return
-        }
-        if (!snapshot.isEmpty) return
-
-        val seedAccounts = listOf(
-            Triple("admin", "Admin", Roles.ADMIN),
-            Triple("ravi", "Ravi", Roles.EMPLOYEE),
-            Triple("tech", "Technician", Roles.TECHNICIAN)
-        )
-
-        val batch = db.batch()
-        for ((username, name, role) in seedAccounts) {
-            val salt = PasswordHasher.generateSalt()
-            val hash = PasswordHasher.hash("1234", salt)
-            val ref = db.collection("users").document(username)
-            batch.set(ref, mapOf(
-                "username" to username,
-                "name" to name,
-                "passwordHash" to hash,
-                "passwordSalt" to salt,
-                "role" to role,
-                "active" to true,
-                "createdAt" to System.currentTimeMillis()
-            ))
-        }
-        batch.commit().await()
-    }
-
     suspend fun login(username: String, password: String): LoginResult {
         return try {
             val docId = username.trim().lowercase()

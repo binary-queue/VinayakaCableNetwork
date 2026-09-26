@@ -10,7 +10,7 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="@color/cm_sidebar"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -43,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
                 app:cardBackgroundColor="@color/dashboard_card"
-                app:cardCornerRadius="24dp"
+                app:cardCornerRadius="14dp"
                 app:strokeWidth="0dp">
 
                 <LinearLayout
@@ -128,6 +128,41 @@
                             app:iconTint="@color/accent_red" />
 
                     </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnToggleConnection"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/deactivate_connection"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReviseBill"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/revise_current_bill"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnCallCustomer"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/call_customer"
+                        app:icon="@android:drawable/ic_menu_call" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnCustomerWhatsapp"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/whatsapp_customer" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -137,7 +172,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
                 app:cardBackgroundColor="@color/dashboard_card"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="14dp"
                 app:strokeWidth="1dp"
                 app:strokeColor="@color/dashboard_border">
 
@@ -181,7 +216,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
                 app:cardBackgroundColor="@color/dashboard_card"
-                app:cardCornerRadius="20dp"
+                app:cardCornerRadius="14dp"
                 app:strokeWidth="1dp"
                 app:strokeColor="@color/dashboard_border">
 
@@ -237,6 +272,36 @@
                             android:inputType="numberDecimal" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPayFull"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:text="@string/pay_full" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPayBillOnly"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:text="@string/pay_bill_only" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnPayHalf"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:text="@string/pay_half" />
+                    </LinearLayout>
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilPaymentMode"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
@@ -278,6 +343,26 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:visibility="gone" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="@string/payment_remarks"
+                        android:layout_marginBottom="8dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etRemarks"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapSentences|textMultiLine"
+                            android:maxLines="3" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchSmsReceipt"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/send_sms_receipt"
+                        android:layout_marginBottom="8dp" />
 
                     <Button
                         android:id="@+id/btnSubmitPayment"
@@ -329,6 +414,14 @@
                 android:layout_height="56dp"
                 android:text="@string/payment_history"
                 app:cornerRadius="16dp" />
+
+            <Button
+                android:id="@+id/btnViewLedger"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/monthly_ledger" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

@@ -119,7 +119,14 @@ class CustomerViewModel : ViewModel() {
             paymentStatus = paymentStatusRaw ?: statusVal,
             connectionStatus = connStatus,
             deactivatedMonth = doc.getString("deactivatedMonth"),
-            lastPaidMonth = doc.getString("lastPaidMonth") ?: ""
+            reconnectedMonth = doc.getString("reconnectedMonth"),
+            lastPaidMonth = doc.getString("lastPaidMonth") ?: "",
+            joinMonth = doc.getString("joinMonth") ?: "",
+            vcNumber = doc.getString("vcNumber") ?: doc.getString("VC No") ?: "",
+            boxNumber = doc.getString("boxNumber") ?: doc.getString("STB/box No") ?: "",
+            crfNumber = doc.getString("crfNumber") ?: doc.getString("CRF No") ?: "",
+            address = doc.getString("address") ?: "",
+            packageId = doc.getString("packageId") ?: doc.getString("package") ?: ""
         )
     }
 

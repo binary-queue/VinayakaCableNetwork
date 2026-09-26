@@ -8,44 +8,44 @@
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
 
-    <!-- Premium Dark Theme Colors -->
-    <color name="dashboard_bg">#0F172A</color>
-    <color name="dashboard_card">#1E293B</color>
-    <color name="dashboard_border">#334155</color>
-    <color name="dashboard_text_primary">#F8FAFC</color>
-    <color name="dashboard_text_secondary">#94A3B8</color>
-    <color name="dashboard_icon_bg">#334155</color>
-    <color name="dashboard_bottom_nav">#0F172A</color>
+    <color name="dashboard_bg">@color/cm_bg</color>
+    <color name="dashboard_card">@color/cm_card</color>
+    <color name="dashboard_border">@color/cm_border</color>
+    <color name="dashboard_text_primary">@color/cm_text_primary</color>
+    <color name="dashboard_text_secondary">@color/cm_text_secondary</color>
+    <color name="dashboard_icon_bg">@color/cm_card2</color>
+    <color name="dashboard_bottom_nav">@color/cm_card</color>
 
     <!-- Accent Colors -->
-    <color name="accent_blue">#3B82F6</color>
-    <color name="accent_green">#22C55E</color>
-    <color name="accent_red">#EF4444</color>
-    <color name="accent_orange">#F59E0B</color>
+    <color name="accent_blue">@color/cm_blue</color>
+    <color name="accent_green">@color/cm_teal</color>
+    <color name="accent_red">@color/cm_coral</color>
+    <color name="accent_orange">@color/cm_amber</color>
     <color name="accent_pink">#EC4899</color>
     <color name="accent_purple">#A855F7</color>
 
-    <!-- ══ CableManager design tokens (light) — mockup-aligned ══ -->
-    <color name="cm_bg">#EEF1FB</color>
+    <!-- CableManager design tokens (light), aligned with the supplied app reference. -->
+    <color name="cm_bg">#F0F4F8</color>
     <color name="cm_card">#FFFFFF</color>
-    <color name="cm_card2">#F0F3FF</color>
-    <color name="cm_input_bg">#F0F3FF</color>
-    <color name="cm_border">#D8DFF5</color>
-    <color name="cm_text_primary">#1A1E35</color>
-    <color name="cm_text_secondary">#4D5580</color>
-    <color name="cm_text_tertiary">#9AA0C0</color>
-    <color name="cm_sidebar">#1A1E35</color>
-    <color name="cm_divider">#0D000000</color>
-    <color name="cm_nav_active">#1C2D5FE8</color>
-    <color name="cm_blue">#2D5FE8</color>
-    <color name="cm_blue_soft">#1A2D5FE8</color>
-    <color name="cm_coral">#E84545</color>
-    <color name="cm_coral_soft">#1AE84545</color>
-    <color name="cm_amber">#F08C00</color>
-    <color name="cm_amber_soft">#1AF08C00</color>
-    <color name="cm_teal">#1A9AAA</color>
-    <color name="cm_teal_soft">#1A1A9AAA</color>
-    <color name="cm_sky">#2563EB</color>
-    <color name="cm_sky_soft">#1A2563EB</color>
+    <color name="cm_card2">#F8FAFC</color>
+    <color name="cm_input_bg">#F8FAFC</color>
+    <color name="cm_border">#E2E8F0</color>
+    <color name="cm_text_primary">#0A1524</color>
+    <color name="cm_text_secondary">#475569</color>
+    <color name="cm_text_tertiary">#8494A8</color>
+    <color name="cm_sidebar">#062A42</color>
+    <color name="cm_divider">#120A1524</color>
+    <color name="cm_nav_active">#1A0F6FA3</color>
+    <color name="cm_blue">#0F6FA3</color>
+    <color name="cm_blue_soft">#1A0F6FA3</color>
+    <color name="cm_coral">#B9243F</color>
+    <color name="cm_coral_soft">#1AB9243F</color>
+    <color name="cm_amber">#A9640C</color>
+    <color name="cm_amber_soft">#1AA9640C</color>
+    <color name="cm_teal">#0F7B52</color>
+    <color name="cm_teal_soft">#1A0F7B52</color>
+    <color name="cm_sky">#0F6FA3</color>
+    <color name="cm_sky_soft">#1A0F6FA3</color>
     <color name="cm_on_gradient">#FFFFFF</color>
+    <color name="cm_nav_secondary">#BFFFFFFF</color>
 </resources>

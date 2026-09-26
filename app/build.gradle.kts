@@ -6,6 +6,9 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+val useFirestoreEmulator = providers.gradleProperty("useFirestoreEmulator")
+    .orNull?.toBoolean() ?: false
+
 android {
     namespace = "com.saimega.vinayakacablenetwork"
     compileSdk = 36
@@ -16,6 +19,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("boolean", "USE_FIRESTORE_EMULATOR", useFirestoreEmulator.toString())
     }
 
     buildTypes {
@@ -37,6 +41,7 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 

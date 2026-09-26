@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="dashboard_bg">#0A0A0F</color>
-    <color name="dashboard_card">#16161D</color>
-    <color name="dashboard_border">#27272A</color>
-    <color name="dashboard_text_primary">#FFFFFF</color>
-    <color name="dashboard_text_secondary">#A1A1AA</color>
-    <color name="dashboard_icon_bg">#27272A</color>
-    <color name="dashboard_bottom_nav">#16161D</color>
+    <color name="dashboard_bg">@color/cm_bg</color>
+    <color name="dashboard_card">@color/cm_card</color>
+    <color name="dashboard_border">@color/cm_border</color>
+    <color name="dashboard_text_primary">@color/cm_text_primary</color>
+    <color name="dashboard_text_secondary">@color/cm_text_secondary</color>
+    <color name="dashboard_icon_bg">@color/cm_card2</color>
+    <color name="dashboard_bottom_nav">@color/cm_card</color>
 
-    <!-- ══ CableManager design tokens (dark) — mockup-aligned ══ -->
-    <color name="cm_bg">#0C0F1A</color>
-    <color name="cm_card">#181C2E</color>
-    <color name="cm_card2">#1E2238</color>
-    <color name="cm_input_bg">#1E2238</color>
-    <color name="cm_border">#262B45</color>
-    <color name="cm_text_primary">#DDE1F0</color>
-    <color name="cm_text_secondary">#7E87A8</color>
-    <color name="cm_text_tertiary">#454D6A</color>
-    <color name="cm_sidebar">#0A0D18</color>
-    <color name="cm_divider">#0AFFFFFF</color>
-    <color name="cm_nav_active">#294F80FF</color>
-    <color name="cm_blue">#4F80FF</color>
-    <color name="cm_blue_soft">#244F80FF</color>
-    <color name="cm_coral">#FF6B6B</color>
-    <color name="cm_coral_soft">#21FF6B6B</color>
-    <color name="cm_amber">#FFB347</color>
-    <color name="cm_amber_soft">#21FFB347</color>
-    <color name="cm_teal">#38C5D4</color>
-    <color name="cm_teal_soft">#2138C5D4</color>
-    <color name="cm_sky">#60A5FA</color>
-    <color name="cm_sky_soft">#2160A5FA</color>
+    <!-- CableManager design tokens (dark), aligned with the supplied app reference. -->
+    <color name="cm_bg">#070C14</color>
+    <color name="cm_card">#0E1622</color>
+    <color name="cm_card2">#131D2C</color>
+    <color name="cm_input_bg">#131D2C</color>
+    <color name="cm_border">#1E2B3D</color>
+    <color name="cm_text_primary">#E9EFF7</color>
+    <color name="cm_text_secondary">#93A3B8</color>
+    <color name="cm_text_tertiary">#708197</color>
+    <color name="cm_sidebar">#062A42</color>
+    <color name="cm_divider">#1EFFFFFF</color>
+    <color name="cm_nav_active">#263FA9DC</color>
+    <color name="cm_blue">#3FA9DC</color>
+    <color name="cm_blue_soft">#263FA9DC</color>
+    <color name="cm_coral">#FB7591</color>
+    <color name="cm_coral_soft">#26FB7591</color>
+    <color name="cm_amber">#F6B843</color>
+    <color name="cm_amber_soft">#26F6B843</color>
+    <color name="cm_teal">#3FD6A0</color>
+    <color name="cm_teal_soft">#263FD6A0</color>
+    <color name="cm_sky">#3FA9DC</color>
+    <color name="cm_sky_soft">#263FA9DC</color>
     <color name="cm_on_gradient">#FFFFFF</color>
 </resources>

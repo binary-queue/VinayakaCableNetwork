@@ -2,6 +2,7 @@ package com.saimega.vinayakacablenetwork
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -23,11 +24,15 @@ class DashboardActivity : BaseActivity() {
     private lateinit var tvUnpaidCount: TextView
     private lateinit var tvPartialCount: TextView
     private lateinit var tvTotalCount: TextView
+    private lateinit var tvActiveCount: TextView
+    private lateinit var tvInactiveCount: TextView
     private lateinit var tvTodayAmount: TextView
     private lateinit var tvTotalOutstanding: TextView
     private lateinit var tvMonthBilling: TextView
     private lateinit var tvMonthCollection: TextView
     private lateinit var tvEmployeeToday: TextView
+    private lateinit var tvEmployeeMonthCollection: TextView
+    private lateinit var progressEmployeeMonth: android.widget.ProgressBar
     private lateinit var tvProgressPercent: TextView
     private lateinit var progressFill: View
     private lateinit var progressRemainder: View
@@ -38,6 +43,8 @@ class DashboardActivity : BaseActivity() {
     private lateinit var chipLastMonth: TextView
     private lateinit var chipCustomRange: TextView
     private lateinit var tvCollectionLabel: TextView
+    private lateinit var recentPaymentsContainer: android.widget.LinearLayout
+    private lateinit var tvNoRecentPayments: TextView
 
     private var countListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var role: String = Roles.ADMIN
@@ -83,11 +90,15 @@ class DashboardActivity : BaseActivity() {
         tvUnpaidCount = findViewById(R.id.tvUnpaidCount)
         tvPartialCount = findViewById(R.id.tvPartialCount)
         tvTotalCount = findViewById(R.id.tvTotalCount)
+        tvActiveCount = findViewById(R.id.tvActiveCount)
+        tvInactiveCount = findViewById(R.id.tvInactiveCount)
         tvTodayAmount = findViewById(R.id.tvTodayAmount)
         tvTotalOutstanding = findViewById(R.id.tvTotalOutstanding)
         tvMonthBilling = findViewById(R.id.tvMonthBilling)
         tvMonthCollection = findViewById(R.id.tvMonthCollection)
         tvEmployeeToday = findViewById(R.id.tvEmployeeToday)
+        tvEmployeeMonthCollection = findViewById(R.id.tvEmployeeMonthCollection)
+        progressEmployeeMonth = findViewById(R.id.progressEmployeeMonth)
         tvProgressPercent = findViewById(R.id.tvProgressPercent)
         progressFill = findViewById(R.id.progressFill)
         progressRemainder = findViewById(R.id.progressRemainder)
@@ -98,6 +109,8 @@ class DashboardActivity : BaseActivity() {
         chipLastMonth = findViewById(R.id.chipLastMonth)
         chipCustomRange = findViewById(R.id.chipCustomRange)
         tvCollectionLabel = findViewById(R.id.tvCollectionLabel)
+        recentPaymentsContainer = findViewById(R.id.recentPaymentsContainer)
+        tvNoRecentPayments = findViewById(R.id.tvNoRecentPayments)
 
         val username = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE).getString("username", "Admin") ?: "Admin"
         findViewById<TextView>(R.id.tvProfileInitial).text = username.firstOrNull()?.uppercase() ?: "A"
@@ -124,6 +137,22 @@ class DashboardActivity : BaseActivity() {
         }
         findViewById<View>(R.id.statPartial).setOnClickListener {
             startActivity(Intent(this, CustomerListActivity::class.java).putExtra("FILTER_TYPE", "PARTIAL"))
+        }
+        findViewById<View>(R.id.statTodayCollection).setOnClickListener {
+            startActivity(Intent(this, TodayCollectionActivity::class.java))
+        }
+        findViewById<View>(R.id.statActive).setOnClickListener {
+            startActivity(Intent(this, CustomerListActivity::class.java)
+                .putExtra("FILTER_TYPE", "ACTIVE")
+                .putExtra("MONTH_KEY", currentViewedMonthKey()))
+        }
+        findViewById<View>(R.id.statInactive).setOnClickListener {
+            startActivity(Intent(this, CustomerListActivity::class.java)
+                .putExtra("FILTER_TYPE", "INACTIVE")
+                .putExtra("MONTH_KEY", currentViewedMonthKey()))
+        }
+        employeeFinSection.setOnClickListener {
+            startActivity(Intent(this, TodayCollectionActivity::class.java))
         }
     }
 
@@ -184,7 +213,10 @@ class DashboardActivity : BaseActivity() {
             val message = when (result) {
                 is BillingRunResult.Success -> getString(R.string.bills_generated_format, result.customersBilled)
                 is BillingRunResult.AlreadyRun -> getString(R.string.bills_already_generated)
-                is BillingRunResult.Failure -> getString(R.string.error_prefix, result.exception.message)
+                is BillingRunResult.Failure -> {
+                    Log.e("GenerateBills", "Billing run failed for $monthKey", result.exception)
+                    getString(R.string.error_prefix, result.exception.message)
+                }
             }
             Toast.makeText(this@DashboardActivity, message, Toast.LENGTH_LONG).show()
         }
@@ -196,15 +228,34 @@ class DashboardActivity : BaseActivity() {
 
     private fun setupDateFilters() {
         chipThisMonth.setOnClickListener { selectPeriod(DashboardPeriod.THIS_MONTH) }
-        chipLastMonth.setOnClickListener { selectPeriod(DashboardPeriod.LAST_MONTH) }
-        chipCustomRange.setOnClickListener { showCustomRangePicker() }
+        if (role == Roles.ADMIN) {
+            chipLastMonth.setOnClickListener { selectPeriod(DashboardPeriod.LAST_MONTH) }
+            chipCustomRange.setOnClickListener { showCustomRangePicker() }
+        } else {
+            chipLastMonth.visibility = View.GONE
+            chipCustomRange.visibility = View.GONE
+        }
         updateFilterChipStyles()
     }
 
     private fun selectPeriod(period: DashboardPeriod) {
+        if (role != Roles.ADMIN && period != DashboardPeriod.THIS_MONTH) return
         selectedPeriod = period
         updateFilterChipStyles()
         fetchCollectionSummaries()
+        listenToCustomerStats(refresh = true)
+    }
+
+    private fun currentViewedMonthKey(): String {
+        val month = Calendar.getInstance()
+        when (selectedPeriod) {
+            DashboardPeriod.THIS_MONTH -> Unit
+            DashboardPeriod.LAST_MONTH -> month.add(Calendar.MONTH, -1)
+            DashboardPeriod.CUSTOM -> if (customRangeStartMs > 0L) {
+                month.timeInMillis = customRangeStartMs
+            }
+        }
+        return SimpleDateFormat("yyyy-MM", Locale.US).format(month.time)
     }
 
     private fun updateFilterChipStyles() {
@@ -288,7 +339,11 @@ class DashboardActivity : BaseActivity() {
                     false
                 }
                 R.id.nav_pay -> {
-                    startActivity(Intent(this, CustomerListActivity::class.java).putExtra("FILTER_TYPE", "ALL"))
+                    startActivity(Intent(this, TodayCollectionActivity::class.java))
+                    false
+                }
+                R.id.nav_reports -> {
+                    startActivity(Intent(this, ReportActivity::class.java))
                     false
                 }
                 R.id.nav_settings -> {
@@ -413,18 +468,14 @@ class DashboardActivity : BaseActivity() {
 
     private fun getColorCompat(colorRes: Int): Int = androidx.core.content.ContextCompat.getColor(this, colorRes)
 
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
+
     override fun onResume() {
         super.onResume()
         listenToCustomerStats()
         fetchCollectionSummaries()
         renderSixMonthTrend()
-        lifecycleScope.launch {
-            try {
-                CustomerRepository().refreshConnectionStatuses()
-            } catch (e: Exception) {
-                android.util.Log.e("Dashboard", "Connection status refresh failed: ${e.message}")
-            }
-        }
+        loadRecentPayments()
     }
 
     override fun onPause() {
@@ -450,13 +501,43 @@ class DashboardActivity : BaseActivity() {
                     .get().await()
                 val customerSnap = db.collection("customers").get().await()
 
-                val todaySum = todaySnap.documents.sumOf { it.getDouble("paid") ?: 0.0 }
-                val periodCollectionSum = periodSnap.documents.sumOf { it.getDouble("paid") ?: 0.0 }
+                val username = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE)
+                    .getString("username", "") ?: ""
+                val visibleTodayPayments = if (role == Roles.ADMIN) todaySnap.documents else
+                    todaySnap.documents.filter { it.getString("collectorUsername").equals(username, true) }
+                val visiblePeriodPayments = if (role == Roles.ADMIN) periodSnap.documents else
+                    periodSnap.documents.filter { it.getString("collectorUsername").equals(username, true) }
+                val todaySum = visibleTodayPayments.sumOf { (it.get("paid") as? Number)?.toDouble() ?: 0.0 }
+                val periodCollectionSum = visiblePeriodPayments.sumOf { (it.get("paid") as? Number)?.toDouble() ?: 0.0 }
                 val outstandingSum = customerSnap.documents.sumOf { (it.get("pendingAmount") as? Number)?.toDouble() ?: 0.0 }
-                val baseSum = customerSnap.documents.sumOf { (it.get("baseAmount") as? Number)?.toDouble() ?: 0.0 }
+                val monthKey = currentViewedMonthKey()
+                val activeForMonth = customerSnap.documents.filter { doc ->
+                    BillingCycle.isActiveForMonth(
+                        CustomerBillingState(
+                            id = doc.id,
+                            connectionStatus = doc.getString("Connection Status") ?: "active",
+                            pendingAmount = (doc.get("pendingAmount") as? Number)?.toDouble() ?: 0.0,
+                            monthlyCharge = (doc.get("monthlyCharge") as? Number)?.toDouble()
+                                ?: (doc.get("baseAmount") as? Number)?.toDouble() ?: 0.0,
+                            lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
+                            deactivatedMonth = doc.getString("deactivatedMonth"),
+                            reconnectedMonth = doc.getString("reconnectedMonth")
+                        ),
+                        monthKey
+                    )
+                }
+                val baseSum = activeForMonth.sumOf {
+                    (it.get("monthlyCharge") as? Number)?.toDouble()
+                        ?: (it.get("baseAmount") as? Number)?.toDouble() ?: 0.0
+                }
 
                 tvTodayAmount.text = formatCurrency(todaySum)
                 tvEmployeeToday.text = formatCurrency(todaySum)
+                tvEmployeeMonthCollection.text = formatCurrency(periodCollectionSum)
+                val employeeProgress = if (baseSum > 0.0) {
+                    ((periodCollectionSum / baseSum) * 100).toInt().coerceIn(0, 100)
+                } else 0
+                progressEmployeeMonth.progress = employeeProgress
                 tvTotalOutstanding.text = formatCurrency(outstandingSum)
                 tvMonthBilling.text = formatCurrency(baseSum)
                 tvMonthCollection.text = formatCurrency(periodCollectionSum)
@@ -475,27 +556,106 @@ class DashboardActivity : BaseActivity() {
         }
     }
 
-    private fun listenToCustomerStats() {
-        if (countListener != null) return
+    private fun listenToCustomerStats(refresh: Boolean = false) {
+        if (countListener != null && !refresh) return
+        if (refresh) {
+            countListener?.remove()
+            countListener = null
+        }
         countListener = db.collection("customers")
             .addSnapshotListener { snapshot, e ->
                 if (e != null || snapshot == null) return@addSnapshotListener
-                var paid = 0
-                var unpaid = 0
-                var partial = 0
-                for (doc in snapshot) {
-                    val status = doc.getString("status") ?: "unpaid"
-                    when {
-                        status.equals("paid", true) -> paid++
-                        status.equals("partial", true) -> partial++
-                        else -> unpaid++
+                tvTotalCount.text = snapshot.size().toString()
+                val monthKey = currentViewedMonthKey()
+                val customers = snapshot.documents.map { doc ->
+                    CustomerBillingState(
+                        id = doc.id,
+                        connectionStatus = doc.getString("Connection Status") ?: "active",
+                        pendingAmount = (doc.get("pendingAmount") as? Number)?.toDouble() ?: 0.0,
+                        monthlyCharge = (doc.get("monthlyCharge") as? Number)?.toDouble()
+                            ?: (doc.get("baseAmount") as? Number)?.toDouble() ?: 0.0,
+                        lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
+                        deactivatedMonth = doc.getString("deactivatedMonth"),
+                        reconnectedMonth = doc.getString("reconnectedMonth")
+                    )
+                }
+                lifecycleScope.launch {
+                    try {
+                        val monthStatuses = CustomerRepository().fetchCustomerMonthStatuses(monthKey)
+                            .mapValues { it.value.status }
+                        val counts = BillingCycle.computeDashboardMonthlyCounts(customers, monthStatuses, monthKey)
+                        tvActiveCount.text = counts.active.toString()
+                        tvInactiveCount.text = counts.inactive.toString()
+                        tvPaidCount.text = counts.paid.toString()
+                        tvUnpaidCount.text = counts.unpaid.toString()
+                        tvPartialCount.text = counts.partial.toString()
+                    } catch (e: Exception) {
+                        android.util.Log.e("Dashboard", "Monthly customer status load failed: ${e.message}")
                     }
                 }
-                tvPaidCount.text = paid.toString()
-                tvUnpaidCount.text = unpaid.toString()
-                tvPartialCount.text = partial.toString()
-                tvTotalCount.text = snapshot.size().toString()
             }
+    }
+
+    private fun loadRecentPayments() {
+        lifecycleScope.launch {
+            try {
+                val username = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE)
+                    .getString("username", "") ?: ""
+                val query = if (role == Roles.ADMIN) {
+                    db.collection("payments")
+                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                        .limit(5)
+                } else {
+                    db.collection("payments").whereEqualTo("collectorUsername", username)
+                }
+                val snapshot = query.get().await()
+                val payments = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(PaymentModel::class.java)?.copy(paymentId = doc.id)
+                }.sortedByDescending { it.timestamp }.take(5)
+                recentPaymentsContainer.removeAllViews()
+                tvNoRecentPayments.visibility = if (payments.isEmpty()) View.VISIBLE else View.GONE
+                payments.forEach { payment ->
+                    val row = android.widget.LinearLayout(this@DashboardActivity).apply {
+                        orientation = android.widget.LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        setPadding(0, dpToPx(8), 0, dpToPx(8))
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener {
+                            startActivity(Intent(this@DashboardActivity, CustomerDetailsActivity::class.java).apply {
+                                putExtra("seriesNumber", payment.customerId)
+                            })
+                        }
+                    }
+                    val detail = android.widget.LinearLayout(this@DashboardActivity).apply {
+                        orientation = android.widget.LinearLayout.VERTICAL
+                        layoutParams = android.widget.LinearLayout.LayoutParams(0, -2, 1f)
+                    }
+                    detail.addView(TextView(this@DashboardActivity).apply {
+                        text = payment.displayName(LocaleHelper.getLanguage(this@DashboardActivity))
+                        textSize = 13f
+                        setTextColor(getColorCompat(R.color.cm_text_primary))
+                    })
+                    val paidAt = SimpleDateFormat("d MMM, h:mm a", Locale.getDefault())
+                        .format(Date(payment.timestamp))
+                    detail.addView(TextView(this@DashboardActivity).apply {
+                        text = "$paidAt · ${payment.paymentMode}"
+                        textSize = 11f
+                        setTextColor(getColorCompat(R.color.cm_text_tertiary))
+                    })
+                    row.addView(detail)
+                    row.addView(TextView(this@DashboardActivity).apply {
+                        text = formatCurrency(payment.paid)
+                        textSize = 13f
+                        setTextColor(getColorCompat(R.color.cm_teal))
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    })
+                    recentPaymentsContainer.addView(row)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("Dashboard", "Recent payments load failed: ${e.message}")
+            }
+        }
     }
 
     private fun formatCurrency(amount: Double): String {

@@ -16,8 +16,10 @@ data class CustomerModel(
     val paymentStatus: String = "Unpaid",
     val connectionStatus: String = "active", // "active" or "deactivated"
     val deactivatedMonth: String? = null,
+    val reconnectedMonth: String? = null,
     val lastPaidMonth: String = "",
     val lastBilledMonth: String = "",
+    val joinMonth: String = "",
     val vcNumber: String = "",
     val boxNumber: String = "",
     val crfNumber: String = "",
@@ -26,6 +28,9 @@ data class CustomerModel(
     val altPhone: String = "",
     val packageId: String = ""
 ) : Serializable {
+    fun displayName(languageCode: String): String =
+        if (languageCode == "te" && teluguName.isNotBlank()) teluguName else name
+
     /**
      * A customer is "active" if Connection Status is active.
      */

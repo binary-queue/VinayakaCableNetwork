@@ -36,7 +36,11 @@ data class ReceiptModel(
     val customerName: String,
     val customerId: String,
     val amountPaid: String,   // e.g. "₹500.00"
-    val date: String          // e.g. "05/05/2025 11:57"
+    val date: String,         // e.g. "05/05/2025 11:57"
+    val businessName: String,
+    val businessPhone: String,
+    val businessAddress: String,
+    val receiptFooter: String
 )
 
 /**
@@ -131,7 +135,13 @@ object BluetoothPrinterManager {
 
                 // ── Header (centred) ──────────────────────────────────
                 os.write(center)
-                os.write("Vinayaka Cable Network\n".toByteArray(Charsets.UTF_8))
+                os.write(line(data.businessName).toByteArray(Charsets.UTF_8))
+                if (data.businessPhone.isNotBlank()) {
+                    os.write(line(data.businessPhone).toByteArray(Charsets.UTF_8))
+                }
+                if (data.businessAddress.isNotBlank()) {
+                    os.write(line(data.businessAddress).toByteArray(Charsets.UTF_8))
+                }
                 os.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
 
                 // ── Customer name as BITMAP (Telugu-safe) ─────────────
@@ -153,8 +163,10 @@ object BluetoothPrinterManager {
                 os.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
                 os.write(center)
                 // Telugu footer rendered as bitmap so it prints correctly on any printer
-                val footerBitmap = createTeluguBitmap("ధన్యవాదాలు!")
-                sendBitmapBytes(os, footerBitmap)
+                if (data.receiptFooter.isNotBlank()) {
+                    val footerBitmap = createTeluguBitmap(data.receiptFooter)
+                    sendBitmapBytes(os, footerBitmap)
+                }
 
                 os.write(feedAndCut)
                 os.flush()
@@ -367,7 +379,11 @@ object BluetoothPrinterManager {
     suspend fun printBillingReceipt(
         customerName: String,
         amount: String,
-        date: String
+        date: String,
+        businessName: String,
+        businessPhone: String,
+        businessAddress: String,
+        receiptFooter: String
     ): Boolean {
         if (socket == null || !_isConnected.value) return false
 
@@ -394,7 +410,9 @@ object BluetoothPrinterManager {
 
                 // Header — centred
                 os.write(center)
-                os.write("Vinayaka Cable Network\n".toByteArray(Charsets.UTF_8))
+                os.write(line(businessName).toByteArray(Charsets.UTF_8))
+                if (businessPhone.isNotBlank()) os.write(line(businessPhone).toByteArray(Charsets.UTF_8))
+                if (businessAddress.isNotBlank()) os.write(line(businessAddress).toByteArray(Charsets.UTF_8))
                 os.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
 
                 // Body — left aligned
@@ -410,7 +428,7 @@ object BluetoothPrinterManager {
                 // Footer — centred
                 os.write("--------------------------------\n".toByteArray(Charsets.UTF_8))
                 os.write(center)
-                os.write("Thank you!\n".toByteArray(Charsets.UTF_8))
+                if (receiptFooter.isNotBlank()) os.write(line(receiptFooter).toByteArray(Charsets.UTF_8))
 
                 // Paper feed and cut
                 os.write(feedAndCut)

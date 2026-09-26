@@ -2,7 +2,10 @@ package com.saimega.vinayakacablenetwork
 
 import android.os.Bundle
 import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
@@ -15,6 +18,8 @@ import kotlinx.coroutines.launch
 
 class NewCustomerActivity : BaseActivity() {
 
+    private class DuplicateCustomerException : IllegalStateException()
+
     // ── Firestore ─────────────────────────────────────────────────────────────
     private lateinit var db: FirebaseFirestore
     private val customerRepository = CustomerRepository()
@@ -25,11 +30,19 @@ class NewCustomerActivity : BaseActivity() {
     private lateinit var tilSeriesNumber: TextInputLayout
     private lateinit var tilPhoneNumber: TextInputLayout
     private lateinit var tilBaseAmount: TextInputLayout
+    private lateinit var tilOpeningBalance: TextInputLayout
 
     private lateinit var etFullName: TextInputEditText
     private lateinit var etSeriesNumber: TextInputEditText
     private lateinit var etPhoneNumber: TextInputEditText
     private lateinit var etBaseAmount: TextInputEditText
+    private lateinit var etTeluguName: TextInputEditText
+    private lateinit var etVcNumber: TextInputEditText
+    private lateinit var etBoxNumber: TextInputEditText
+    private lateinit var etCrfNumber: TextInputEditText
+    private lateinit var etAddress: TextInputEditText
+    private lateinit var etPackage: AutoCompleteTextView
+    private lateinit var etOpeningBalance: TextInputEditText
 
     // ── Action views ──────────────────────────────────────────────────────────
     private lateinit var btnSaveCustomer: MaterialButton
@@ -64,11 +77,20 @@ class NewCustomerActivity : BaseActivity() {
         tilSeriesNumber = findViewById(R.id.tilSeriesNumber)
         tilPhoneNumber  = findViewById(R.id.tilPhoneNumber)
         tilBaseAmount   = findViewById(R.id.tilBaseAmount)
+        tilOpeningBalance = findViewById(R.id.tilOpeningBalance)
 
         etFullName     = findViewById(R.id.etFullName)
         etSeriesNumber = findViewById(R.id.etSeriesNumber)
         etPhoneNumber  = findViewById(R.id.etPhoneNumber)
         etBaseAmount   = findViewById(R.id.etBaseAmount)
+        etTeluguName = findViewById(R.id.etTeluguName)
+        etVcNumber = findViewById(R.id.etVcNumber)
+        etBoxNumber = findViewById(R.id.etBoxNumber)
+        etCrfNumber = findViewById(R.id.etCrfNumber)
+        etAddress = findViewById(R.id.etAddress)
+        etPackage = findViewById(R.id.etPackage)
+        etOpeningBalance = findViewById(R.id.etOpeningBalance)
+        loadPackageOptions()
 
         // Bind action views
         btnSaveCustomer = findViewById(R.id.btnSaveCustomer)
@@ -81,6 +103,14 @@ class NewCustomerActivity : BaseActivity() {
             etSeriesNumber.setText(customer.id)
             etPhoneNumber.setText(customer.phone)
             etBaseAmount.setText(if (customer.baseAmount > 0) customer.baseAmount.toString() else "")
+            etTeluguName.setText(customer.teluguName)
+            etVcNumber.setText(customer.vcNumber)
+            etBoxNumber.setText(customer.boxNumber)
+            etCrfNumber.setText(customer.crfNumber)
+            etAddress.setText(customer.address)
+            etPackage.setText(customer.packageId)
+            etOpeningBalance.setText(customer.previousDue.toString())
+            etOpeningBalance.isEnabled = false
             // Series number is the Firestore document ID — changing it here would
             // orphan the existing document instead of renaming it, so it's locked.
             etSeriesNumber.isEnabled = false
@@ -95,6 +125,42 @@ class NewCustomerActivity : BaseActivity() {
                     saveCustomerToFirebase()
                 }
             }
+        }
+    }
+
+    private fun loadPackageOptions() {
+        lifecycleScope.launch {
+            val packages = runCatching { BusinessSettingsRepository().load().packages }.getOrDefault(emptyList())
+            etPackage.setAdapter(ArrayAdapter(
+                this@NewCustomerActivity,
+                android.R.layout.simple_list_item_1,
+                packages.map { it.name }
+            ))
+            etPackage.setOnItemClickListener { _, _, position, _ ->
+                val selected = packages.getOrNull(position) ?: return@setOnItemClickListener
+                etBaseAmount.setText(selected.monthlyRate.toString())
+            }
+            etPackage.setOnClickListener { showPackagePicker() }
+            etPackage.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) showPackagePicker() }
+        }
+    }
+
+    private fun showPackagePicker() {
+        lifecycleScope.launch {
+            val packages = runCatching { BusinessSettingsRepository().load().packages }.getOrDefault(emptyList())
+            if (packages.isEmpty()) {
+                Toast.makeText(this@NewCustomerActivity, R.string.no_packages_configured, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            AlertDialog.Builder(this@NewCustomerActivity)
+                .setTitle(R.string.select_package)
+                .setItems(packages.map { "${it.name} · ₹${it.monthlyRate.toInt()} / month" }.toTypedArray()) { _, index ->
+                    val selected = packages[index]
+                    etPackage.setText(selected.name, false)
+                    etBaseAmount.setText(selected.monthlyRate.toString())
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
         }
     }
 
@@ -113,6 +179,7 @@ class NewCustomerActivity : BaseActivity() {
         tilFullName.error = null
         tilSeriesNumber.error = null
         tilBaseAmount.error = null
+        tilOpeningBalance.error = null
 
         // Full Name — required
         val name = etFullName.text?.toString()?.trim().orEmpty()
@@ -141,6 +208,15 @@ class NewCustomerActivity : BaseActivity() {
             }
         }
 
+        val openingText = etOpeningBalance.text?.toString()?.trim().orEmpty()
+        if (openingText.isNotEmpty()) {
+            val opening = openingText.toDoubleOrNull()
+            if (opening == null || opening < 0) {
+                tilOpeningBalance.error = getString(R.string.enter_a_valid_amount)
+                isValid = false
+            }
+        }
+
         return isValid
     }
 
@@ -161,6 +237,15 @@ class NewCustomerActivity : BaseActivity() {
         val series      = etSeriesNumber.text?.toString()?.trim().orEmpty()
         val phone       = etPhoneNumber.text?.toString()?.trim().orEmpty()
         val baseAmount  = etBaseAmount.text?.toString()?.trim()?.toDoubleOrNull() ?: 0.0
+        val teluguName = etTeluguName.text?.toString()?.trim().orEmpty()
+        val vcNumber = etVcNumber.text?.toString()?.trim().orEmpty()
+        val boxNumber = etBoxNumber.text?.toString()?.trim().orEmpty()
+        val crfNumber = etCrfNumber.text?.toString()?.trim().orEmpty()
+        val address = etAddress.text?.toString()?.trim().orEmpty()
+        val packageName = etPackage.text?.toString()?.trim().orEmpty()
+        val openingOutstanding = etOpeningBalance.text?.toString()?.trim()?.toDoubleOrNull() ?: 0.0
+        val currentMonth = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
+            .format(java.util.Date())
 
         // Use the series number as the document ID so search-by-ID works
         val customerId = series
@@ -171,20 +256,50 @@ class NewCustomerActivity : BaseActivity() {
             "name"          to name,
             "seriesNumber"  to series,
             "phone"         to phone,
+            "telugu name"   to teluguName,
+            "vcNumber"      to vcNumber.ifBlank { series },
+            "VC No"         to vcNumber.ifBlank { series },
+            "boxNumber"     to boxNumber,
+            "STB/box No"    to boxNumber,
+            "crfNumber"     to crfNumber,
+            "CRF No"        to crfNumber,
+            "address"       to address,
+            "package"       to packageName,
+            "packageId"     to packageName,
             "baseAmount"    to baseAmount,
-            "monthlyCharge" to 0.0,
+            "monthlyCharge" to baseAmount,
             "extraCharges"  to 0.0,
-            "previousDue"   to 0.0,
-            "pendingAmount" to baseAmount,   // first month starts as owing the base
-            "finalBill"     to baseAmount,
+            "previousDue"   to openingOutstanding,
+            "pendingAmount" to (baseAmount + openingOutstanding),
+            "lastBilledMonth" to currentMonth,
+            "joinMonth"     to currentMonth,
+            "finalBill"     to (baseAmount + openingOutstanding),
             "status"        to "unpaid",
             "timestamp"     to System.currentTimeMillis()
         )
 
-        // Write to Firestore
-        db.collection("customers")
+        val customerRef = db.collection("customers").document(customerId)
+        val ledgerRef = db.collection("billing")
             .document(customerId)
-            .set(customerData)
+            .collection("months")
+            .document(currentMonth)
+        db.runTransaction { transaction ->
+            if (transaction.get(customerRef).exists()) throw DuplicateCustomerException()
+            transaction.set(customerRef, customerData)
+            transaction.set(ledgerRef, mapOf(
+                "customerId" to customerId,
+                "monthKey" to currentMonth,
+                "bill" to baseAmount,
+                "extraCharges" to 0.0,
+                "previousOutstanding" to openingOutstanding,
+                "paid" to 0.0,
+                "total" to (baseAmount + openingOutstanding),
+                "remaining" to (baseAmount + openingOutstanding),
+                "isBillRevised" to false,
+                "timestamp" to System.currentTimeMillis()
+            ))
+            null
+        }
             .addOnSuccessListener {
                 setLoadingState(false)
                 Toast.makeText(this, getString(R.string.customer_added_successfully), Toast.LENGTH_SHORT).show()
@@ -192,6 +307,10 @@ class NewCustomerActivity : BaseActivity() {
             }
             .addOnFailureListener { e ->
                 setLoadingState(false)
+                if (e.cause is DuplicateCustomerException || e is DuplicateCustomerException) {
+                    tilSeriesNumber.error = getString(R.string.customer_series_already_exists)
+                    return@addOnFailureListener
+                }
                 Toast.makeText(
                     this,
                     getString(R.string.failed_prefix, e.message),
@@ -211,9 +330,26 @@ class NewCustomerActivity : BaseActivity() {
         val name = etFullName.text?.toString()?.trim().orEmpty()
         val phone = etPhoneNumber.text?.toString()?.trim().orEmpty()
         val baseAmount = etBaseAmount.text?.toString()?.trim()?.toDoubleOrNull() ?: 0.0
+        val teluguName = etTeluguName.text?.toString()?.trim().orEmpty()
+        val vcNumber = etVcNumber.text?.toString()?.trim().orEmpty()
+        val boxNumber = etBoxNumber.text?.toString()?.trim().orEmpty()
+        val crfNumber = etCrfNumber.text?.toString()?.trim().orEmpty()
+        val address = etAddress.text?.toString()?.trim().orEmpty()
+        val packageName = etPackage.text?.toString()?.trim().orEmpty()
 
         lifecycleScope.launch {
-            val success = customerRepository.updateCustomer(customer.id, name, phone, baseAmount)
+            val success = customerRepository.updateCustomer(
+                customer.id,
+                name,
+                phone,
+                baseAmount,
+                teluguName,
+                vcNumber,
+                boxNumber,
+                crfNumber,
+                address,
+                packageName
+            )
             setLoadingState(false)
             if (success) {
                 val prefs = getSharedPreferences("vinayaka_prefs", MODE_PRIVATE)

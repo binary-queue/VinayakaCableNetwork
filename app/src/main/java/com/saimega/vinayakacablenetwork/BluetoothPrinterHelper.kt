@@ -17,7 +17,17 @@ object BluetoothPrinterHelper {
         extraCharges: Double,
         totalPaid: Double,
         paymentMode: String,
-        paymentNumber: String
+        paymentNumber: String,
+        receiptNumber: String = "",
+        remainingAmount: Double = 0.0,
+        collectorUsername: String = "",
+        previousOutstanding: Double = 0.0,
+        alreadyPaid: Double = 0.0,
+        totalPayable: Double = 0.0,
+        businessName: String,
+        businessPhone: String,
+        businessAddress: String,
+        receiptFooter: String
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -34,27 +44,34 @@ object BluetoothPrinterHelper {
 
                 val modeText = if (paymentNumber.isNotEmpty()) "$paymentMode ($paymentNumber)" else paymentMode
 
-                val businessName   = context.getString(R.string.business_name_caps)
                 val receiptTitle   = context.getString(R.string.payment_receipt)
                 val seriesLabel    = context.getString(R.string.series_number_label)
                 val thankYouLine   = context.getString(R.string.thank_you_payment)
 
                 val receiptText = """
                     [C]<b>$businessName</b>
+                    [C]$businessPhone
+                    [C]$businessAddress
                     [C]$receiptTitle
                     [L]
                     [C]--------------------------------
                     [L]Name: [R]$customerName
                     [L]$seriesLabel: [R]$customerId
+                    [L]Receipt No: [R]$receiptNumber
                     [L]Date: [R]$date
-                    [L]Base Amount: [R]Rs.$baseAmount
+                    [L]Bill Amount: [R]Rs.$baseAmount
+                    [L]Previous Due: [R]Rs.$previousOutstanding
                     [L]Extra Charges: [R]Rs.$extraCharges
+                    [L]Already Paid: [R]Rs.$alreadyPaid
+                    [L]Total Payable: [R]Rs.$totalPayable
                     [C]--------------------------------
                     [L]<b>Amount Paid:</b> [R]<b>Rs.$totalPaid</b>
+                    [L]Balance: [R]Rs.$remainingAmount
                     [C]--------------------------------
                     [L]Mode: [R]$modeText
+                    [L]Collector: [R]$collectorUsername
                     [L]
-                    [C]$thankYouLine
+                    [C]${if (receiptFooter.isNotBlank()) receiptFooter else thankYouLine}
                     [L]
                     [L]
                 """.trimIndent()

@@ -17,12 +17,27 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="56dp"
-            android:background="@color/cm_card"
+            android:background="@color/cm_sidebar"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingHorizontal="14dp"
             android:paddingVertical="11dp"
             android:elevation="2dp">
+
+            <FrameLayout
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/cm_gradient_blue_logo">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/app_name"
+                    android:src="@drawable/ic_satellite_dish"
+                    app:tint="@color/cm_on_gradient" />
+            </FrameLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -33,8 +48,8 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/dashboard"
-                    android:textColor="@color/cm_text_primary"
+                    android:text="@string/app_name"
+                    android:textColor="@color/cm_on_gradient"
                     android:textSize="15sp"
                     android:textStyle="bold" />
 
@@ -43,7 +58,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Admin · Sai Cable Network"
-                    android:textColor="@color/cm_text_tertiary"
+                    android:textColor="@color/cm_nav_secondary"
                     android:textSize="10.5sp" />
             </LinearLayout>
 
@@ -132,6 +147,61 @@
                             android:focusable="true" />
                     </LinearLayout>
                 </HorizontalScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="9dp">
+                    <LinearLayout
+                        android:id="@+id/statActive"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="5dp"
+                        android:background="@drawable/cm_bg_card"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+                        <TextView
+                            android:id="@+id/tvActiveCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@color/cm_teal"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/active_label"
+                            android:textColor="@color/cm_text_tertiary"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:id="@+id/statInactive"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/cm_bg_card"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+                        <TextView
+                            android:id="@+id/tvInactiveCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@color/cm_coral"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/cut_inactive"
+                            android:textColor="@color/cm_text_tertiary"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <!-- 2x2 stat grid -->
                 <LinearLayout
@@ -328,8 +398,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:background="@drawable/cm_bg_card"
-                        android:padding="13dp"
+                        android:background="@drawable/cm_bg_hero"
+                        android:padding="16dp"
                         android:layout_marginBottom="9dp">
 
                         <TextView
@@ -337,16 +407,16 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="🏦  This Month Collection"
-                            android:textColor="@color/cm_text_tertiary"
-                            android:textSize="10.5sp" />
+                            android:textColor="@color/cm_nav_secondary"
+                            android:textSize="11sp" />
 
                         <TextView
                             android:id="@+id/tvMonthCollection"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="₹0"
-                            android:textColor="@color/cm_teal"
-                            android:textSize="21sp"
+                            android:textColor="@color/cm_on_gradient"
+                            android:textSize="30sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -520,7 +590,62 @@
                         android:textColor="@color/cm_teal"
                         android:textSize="21sp"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/employee_month_collection"
+                        android:textColor="@color/cm_text_tertiary"
+                        android:textSize="10.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvEmployeeMonthCollection"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="₹0"
+                        android:textColor="@color/cm_teal"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <ProgressBar
+                        android:id="@+id/progressEmployeeMonth"
+                        style="@android:style/Widget.ProgressBar.Horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="8dp"
+                        android:max="100"
+                        android:progress="0"
+                        android:progressTint="@color/cm_teal"
+                        android:layout_marginTop="6dp" />
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvRecentPaymentsTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/recent_payments"
+                    android:textColor="@color/cm_text_primary"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvNoRecentPayments"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:padding="16dp"
+                    android:text="@string/no_recent_payments"
+                    android:textColor="@color/cm_text_tertiary"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/recentPaymentsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="13dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -582,14 +707,15 @@
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNav"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="64dp"
             android:background="@color/cm_card"
-            app:itemIconTint="@color/cm_text_secondary"
-            app:itemTextColor="@color/cm_text_secondary"
+            app:itemIconTint="@color/cm_nav_item_tint"
+            app:itemTextColor="@color/cm_nav_item_tint"
             app:itemActiveIndicatorStyle="@null"
-            app:labelVisibilityMode="unlabeled"
+            app:itemIconSize="21dp"
+            app:labelVisibilityMode="labeled"
             app:menu="@menu/bottom_nav_menu"
-            app:elevation="4dp" />
+            app:elevation="0dp" />
 
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

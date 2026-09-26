@@ -4,6 +4,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -39,10 +40,9 @@ class CustomerAdapter(
                 old == new
         }
 
-        // Avatar colours cycling through a branded palette
+        // Avatar colours cycling through the app palette
         private val AVATAR_COLORS = listOf(
-            "#2E7D32", "#1565C0", "#6A1B9A", "#BF360C",
-            "#00695C", "#AD1457", "#0277BD", "#558B2F"
+            R.color.cm_blue, R.color.cm_teal, R.color.cm_amber, R.color.cm_coral
         )
     }
 
@@ -54,89 +54,99 @@ class CustomerAdapter(
         fun bind(item: CustomerModel) {
             // Debug log – high visibility
             Log.e("DATABASE_CHECK", "Customer: ${item.name} | Raw Status: ${item.status}")
+            val monthStatus = monthlyStatuses[item.id]
+            val activeForMonth = isActiveForMonth(item)
+            val displayStatus = statusForMonth(item)
 
             // Name
-            binding.tvCustomerName.text = item.name
+            binding.tvCustomerName.text = item.displayName(LocaleHelper.getLanguage(binding.root.context))
 
             // Series
-            binding.tvSeries.text = binding.root.context.getString(R.string.series_format, item.id)
+            binding.tvSeries.text = binding.root.context.getString(
+                R.string.customer_series_vc_format,
+                item.id,
+                item.vcNumber.ifBlank { item.id }
+            )
+            binding.tvPackageRate.visibility = android.view.View.VISIBLE
+            binding.tvPackageRate.text = binding.root.context.getString(
+                R.string.customer_package_rate_format,
+                item.packageId.ifBlank { binding.root.context.getString(R.string.package_unspecified) },
+                (monthStatus?.bill ?: item.monthlyCharge.takeIf { it > 0.0 } ?: item.baseAmount).toInt()
+            )
 
             // Determine UI state from Firestore status field — never from local arithmetic.
             // DC rule: pendingAmount is the authoritative bill; we never re-add baseAmount.
-            when (item.status.lowercase()) {
-                "paid" -> {
+            when {
+                !activeForMonth -> {
+                    binding.tvStatus.visibility = android.view.View.GONE
+                    binding.tvAmount.visibility = if (item.pendingAmount > 0.0) android.view.View.VISIBLE else android.view.View.GONE
+                    binding.tvAmountBreakdown.visibility = android.view.View.GONE
+                    if (item.pendingAmount > 0.0) {
+                        binding.tvAmount.text = binding.root.context.getString(
+                            R.string.total_due_amount_format,
+                            item.pendingAmount.toInt()
+                        )
+                    }
+                }
+                displayStatus == "paid" -> {
+                    binding.tvStatus.visibility = android.view.View.VISIBLE
                     binding.tvStatus.text = binding.root.context.getString(R.string.paid_caps)
                     binding.tvStatus.setTextColor(Color.WHITE)
                     binding.tvStatus.backgroundTintList =
-                        ColorStateList.valueOf(Color.parseColor("#2E7D32")) // green
+                        ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, R.color.cm_teal))
                     binding.tvAmount.visibility = android.view.View.VISIBLE
                     binding.tvAmountBreakdown.visibility = android.view.View.GONE
-                    binding.tvAmount.text = if (item.baseAmount > 0) "₹${item.baseAmount.toInt()}" else "₹0"
+                    val billedAmount = monthStatus?.bill ?: item.monthlyCharge.takeIf { it > 0.0 } ?: item.baseAmount
+                    binding.tvAmount.text = if (billedAmount > 0) "₹${billedAmount.toInt()}" else "₹0"
                 }
-                "partial" -> {
+                displayStatus == "partial" -> {
+                    binding.tvStatus.visibility = android.view.View.VISIBLE
                     binding.tvStatus.text = binding.root.context.getString(R.string.partial_caps)
                     binding.tvStatus.setTextColor(Color.WHITE)
                     binding.tvStatus.backgroundTintList =
-                        ColorStateList.valueOf(Color.parseColor("#F57C00")) // orange
+                        ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, R.color.cm_amber))
                     
                     // DC Rule: pendingAmount is already the full outstanding bill — don't re-add baseAmount.
-                    val totalDue = item.pendingAmount
+                    val totalDue = monthStatus?.remaining ?: item.pendingAmount
                     binding.tvAmount.visibility = android.view.View.VISIBLE
                     binding.tvAmount.text = binding.root.context.getString(R.string.due_amount_format, totalDue.toInt())
 
                     binding.tvAmountBreakdown.visibility = android.view.View.VISIBLE
-                    binding.tvAmountBreakdown.text = binding.root.context.getString(R.string.pending_amount_format, item.pendingAmount.toInt())
+                    binding.tvAmountBreakdown.text = binding.root.context.getString(R.string.pending_amount_format, totalDue.toInt())
                 }
                 else -> {
                     // unpaid
+                    binding.tvStatus.visibility = android.view.View.VISIBLE
                     binding.tvStatus.text = binding.root.context.getString(R.string.unpaid_caps)
                     binding.tvStatus.setTextColor(Color.WHITE)
                     binding.tvStatus.backgroundTintList =
-                        ColorStateList.valueOf(Color.parseColor("#C62828")) // red
+                        ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, R.color.cm_coral))
                     
                     // DC Rule: pendingAmount is already the full outstanding bill — don't re-add baseAmount.
-                    val totalDue = item.pendingAmount
+                    val totalDue = monthStatus?.remaining ?: item.pendingAmount
                     binding.tvAmount.visibility = android.view.View.VISIBLE
                     binding.tvAmount.text = binding.root.context.getString(R.string.total_due_amount_format, totalDue.toInt())
 
                     binding.tvAmountBreakdown.visibility = android.view.View.VISIBLE
-                    binding.tvAmountBreakdown.text = binding.root.context.getString(R.string.pending_amount_format, item.pendingAmount.toInt())
+                    binding.tvAmountBreakdown.text = binding.root.context.getString(R.string.pending_amount_format, totalDue.toInt())
                 }
             }
 
             // Avatar: first letter of name, colour determined by hashCode for consistency
-            val letter = item.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+            val letter = item.displayName(LocaleHelper.getLanguage(binding.root.context))
+                .firstOrNull()?.uppercaseChar()?.toString() ?: "?"
             binding.tvAvatar.text = letter
             val color = AVATAR_COLORS[Math.abs(item.id.hashCode()) % AVATAR_COLORS.size]
             binding.tvAvatar.backgroundTintList =
-                ColorStateList.valueOf(Color.parseColor(color))
+                ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, color))
 
             // Click
             binding.root.setOnClickListener { onItemClick(item) }
 
-            // Deactivated Badge - only show if past 10th and inactive, or manually deactivated
-            val cal = java.util.Calendar.getInstance()
-            val dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH)
-            val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
-            val currentMonth = sdf.format(cal.time)
-            cal.add(java.util.Calendar.MONTH, -1)
-            val lastMonth = sdf.format(cal.time)
-
-            val isPaidThisMonth = (item.lastPaidMonth == currentMonth)
-            val isPaidLastMonth = (item.lastPaidMonth == lastMonth)
-            
-            val shouldBeActive = if (dayOfMonth <= 10) {
-                isPaidLastMonth || isPaidThisMonth
-            } else {
-                isPaidThisMonth
-            }
-
-            if (!shouldBeActive) {
+            if (!activeForMonth) {
                 binding.chipDeactivated.visibility = android.view.View.VISIBLE
-                val deactivatedText = if (item.deactivatedMonth != null) 
-                    "Deactivated in: ${item.deactivatedMonth}" 
-                    else "Deactivated (Unpaid)"
-                binding.chipDeactivated.text = deactivatedText
+                binding.chipDeactivated.text = binding.root.context.getString(R.string.cut_inactive)
+                binding.tvPackageRate.visibility = android.view.View.GONE
             } else {
                 binding.chipDeactivated.visibility = android.view.View.GONE
             }
@@ -188,14 +198,44 @@ class CustomerAdapter(
 
     private var currentQuery = ""
     private var statusFilter = "all"
+    private var selectedMonthKey = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+    private var monthlyStatuses: Map<String, CustomerMonthStatus> = emptyMap()
+
+    fun setMonthFilter(monthKey: String, statuses: Map<String, CustomerMonthStatus>): Int {
+        selectedMonthKey = monthKey
+        monthlyStatuses = statuses
+        return applyFilter(currentQuery)
+    }
+
+    private fun statusForMonth(customer: CustomerModel): String {
+        monthlyStatuses[customer.id]?.status?.let { return it }
+        val currentMonth = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault()).format(java.util.Date())
+        if (selectedMonthKey == currentMonth) return customer.status.lowercase()
+        return if (customer.lastPaidMonth == selectedMonthKey) "paid" else "unpaid"
+    }
+
+    private fun isActiveForMonth(customer: CustomerModel): Boolean = BillingCycle.isActiveForMonth(
+        CustomerBillingState(
+            id = customer.id,
+            connectionStatus = customer.connectionStatus,
+            pendingAmount = customer.pendingAmount,
+            monthlyCharge = customer.monthlyCharge,
+            lastBilledMonth = customer.lastBilledMonth,
+            deactivatedMonth = customer.deactivatedMonth,
+            reconnectedMonth = customer.reconnectedMonth
+        ),
+        selectedMonthKey
+    )
 
     private fun applyFilter(query: String): Int {
         val result = if (query.isBlank()) {
             // No active search — browse the status-filtered list (e.g. "Paid" from a stat card).
             val byStatus = when (statusFilter) {
-                "paid" -> fullList.filter { it.status.equals("paid", true) }
-                "unpaid" -> fullList.filter { it.status.equals("unpaid", true) }
-                "partial" -> fullList.filter { it.status.equals("partial", true) }
+                "paid" -> fullList.filter { isActiveForMonth(it) && statusForMonth(it) == "paid" }
+                "unpaid" -> fullList.filter { isActiveForMonth(it) && statusForMonth(it) == "unpaid" }
+                "partial" -> fullList.filter { isActiveForMonth(it) && statusForMonth(it) == "partial" }
+                "active" -> fullList.filter { isActiveForMonth(it) }
+                "inactive" -> fullList.filterNot { isActiveForMonth(it) }
                 else -> fullList
             }
             byStatus.sortedBy { it.name.lowercase() }
@@ -206,7 +246,12 @@ class CustomerAdapter(
             val lower = query.lowercase()
             fullList.filter { c ->
                 c.name.lowercase().contains(lower) ||
-                c.id.lowercase().contains(lower)
+                c.teluguName.lowercase().contains(lower) ||
+                c.id.lowercase().contains(lower) ||
+                c.phone.lowercase().contains(lower) ||
+                c.vcNumber.lowercase().contains(lower) ||
+                c.boxNumber.lowercase().contains(lower) ||
+                c.crfNumber.lowercase().contains(lower)
             }.sortedWith(
                 compareByDescending<CustomerModel> { it.name.lowercase().startsWith(lower) }
                     .thenBy { it.name.lowercase() }
