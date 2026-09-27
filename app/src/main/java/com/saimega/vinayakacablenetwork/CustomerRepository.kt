@@ -61,7 +61,9 @@ class CustomerRepository {
             lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
             joinMonth = doc.getString("joinMonth") ?: "",
             vcNumber = doc.getString("vcNumber") ?: doc.getString("VC No") ?: "",
-            boxNumber = doc.getString("boxNumber") ?: doc.getString("STB/box No") ?: "",
+            boxNumber = doc.getString("boxNumber")
+                ?: (doc.get(com.google.firebase.firestore.FieldPath.of("STB/box No")) as? String)
+                ?: "",
             crfNumber = doc.getString("crfNumber") ?: doc.getString("CRF No") ?: "",
             address = doc.getString("address") ?: "",
             packageId = doc.getString("packageId") ?: doc.getString("package") ?: ""
@@ -744,8 +746,9 @@ class CustomerRepository {
         packageName: String
     ): Boolean {
         return try {
-            db.collection("customers").document(id)
-                .update(mapOf(
+            val customerRef = db.collection("customers").document(id)
+            val batch = db.batch()
+            batch.update(customerRef, mapOf(
                     "name" to name,
                     "phone" to phone,
                     "baseAmount" to baseAmount,
@@ -754,14 +757,18 @@ class CustomerRepository {
                     "vcNumber" to vcNumber,
                     "VC No" to vcNumber,
                     "boxNumber" to boxNumber,
-                    "STB/box No" to boxNumber,
                     "crfNumber" to crfNumber,
                     "CRF No" to crfNumber,
                     "address" to address,
                     "package" to packageName,
                     "packageId" to packageName
                 ))
-                .await()
+            batch.update(
+                customerRef,
+                com.google.firebase.firestore.FieldPath.of("STB/box No"),
+                boxNumber
+            )
+            batch.commit().await()
             true
         } catch (e: Exception) {
             false

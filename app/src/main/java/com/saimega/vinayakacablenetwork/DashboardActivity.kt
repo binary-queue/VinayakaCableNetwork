@@ -73,6 +73,7 @@ class DashboardActivity : BaseActivity() {
         setupBottomNav()
         setupDateFilters()
         applyStatusBarInset()
+        applyBottomNavInsets()
     }
 
     private fun applyStatusBarInset() {
@@ -81,6 +82,20 @@ class DashboardActivity : BaseActivity() {
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(topBar) { view, insets ->
             val statusBarInset = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             view.setPadding(view.paddingLeft, statusBarInset.top + basePaddingTop, view.paddingRight, view.paddingBottom)
+            insets
+        }
+    }
+
+    private fun applyBottomNavInsets() {
+        val bottomNav = findViewById<View>(R.id.bottomNav)
+        val baseHeight = bottomNav.layoutParams.height
+        val basePaddingBottom = bottomNav.paddingBottom
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(bottomNav) { view, insets ->
+            val bottomInset = insets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.navigationBars()
+            ).bottom
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, basePaddingBottom + bottomInset)
+            view.layoutParams = view.layoutParams.apply { height = baseHeight + bottomInset }
             insets
         }
     }
@@ -329,30 +344,40 @@ class DashboardActivity : BaseActivity() {
     }
 
     private fun setupBottomNav() {
-        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNav)
-        bottomNav.selectedItemId = R.id.nav_home
-        bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> true
-                R.id.nav_customers -> {
-                    startActivity(Intent(this, CustomerListActivity::class.java).putExtra("FILTER_TYPE", "ALL"))
-                    false
-                }
-                R.id.nav_pay -> {
-                    startActivity(Intent(this, TodayCollectionActivity::class.java))
-                    false
-                }
-                R.id.nav_reports -> {
-                    startActivity(Intent(this, ReportActivity::class.java))
-                    false
-                }
-                R.id.nav_settings -> {
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                    false
-                }
-                else -> false
+        val items = listOf(
+            Triple(R.id.nav_home, R.id.nav_home_icon, R.id.nav_home_label),
+            Triple(R.id.nav_customers, R.id.nav_customers_icon, R.id.nav_customers_label),
+            Triple(R.id.nav_pay, R.id.nav_pay_icon, R.id.nav_pay_label),
+            Triple(R.id.nav_reports, R.id.nav_reports_icon, R.id.nav_reports_label),
+            Triple(R.id.nav_settings, R.id.nav_settings_icon, R.id.nav_settings_label)
+        )
+
+        fun selectItem(selectedId: Int) {
+            items.forEach { (itemId, iconId, labelId) ->
+                val selected = itemId == selectedId
+                val color = getColorCompat(if (selected) R.color.cm_blue else R.color.cm_text_secondary)
+                findViewById<View>(itemId).isSelected = selected
+                findViewById<android.widget.ImageView>(iconId).setColorFilter(color)
+                findViewById<TextView>(labelId).setTextColor(color)
             }
         }
+
+        items.forEach { (itemId, _, _) ->
+            findViewById<View>(itemId).setOnClickListener {
+                selectItem(itemId)
+                when (itemId) {
+                    R.id.nav_home -> Unit
+                    R.id.nav_customers -> startActivity(
+                        Intent(this, CustomerListActivity::class.java).putExtra("FILTER_TYPE", "ALL")
+                    )
+                    R.id.nav_pay -> startActivity(Intent(this, TodayCollectionActivity::class.java))
+                    R.id.nav_reports -> startActivity(Intent(this, ReportActivity::class.java))
+                    R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
+                }
+            }
+        }
+
+        selectItem(R.id.nav_home)
     }
 
     /**

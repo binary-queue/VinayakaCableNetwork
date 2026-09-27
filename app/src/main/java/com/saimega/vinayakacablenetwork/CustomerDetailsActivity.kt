@@ -394,7 +394,9 @@ class CustomerDetailsActivity : BaseActivity() {
                         reconnectedMonth = doc.getString("reconnectedMonth"),
                         lastBilledMonth = doc.getString("lastBilledMonth") ?: "",
                         vcNumber = doc.getString("vcNumber") ?: doc.getString("VC No") ?: "",
-                        boxNumber = doc.getString("boxNumber") ?: doc.getString("STB/box No") ?: "",
+                        boxNumber = doc.getString("boxNumber")
+                            ?: (doc.get(com.google.firebase.firestore.FieldPath.of("STB/box No")) as? String)
+                            ?: "",
                         crfNumber = doc.getString("crfNumber") ?: doc.getString("CRF No") ?: "",
                         address = doc.getString("address") ?: "",
                         packageId = doc.getString("packageId") ?: doc.getString("package") ?: ""
